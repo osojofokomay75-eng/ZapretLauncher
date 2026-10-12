@@ -47,8 +47,9 @@ namespace ZapretLauncher
         }
 
         /// <summary>
-        /// The same exe is the installer (named *Setup.exe, or started with --setup) and the
-        /// uninstaller (--uninstall). Returns true if one of those took over the start-up.
+        /// The same exe is the installer and the uninstaller (--uninstall). It installs when it is named
+        /// *Setup.exe, started with --setup, or simply is not the installed copy.
+        /// Returns true if one of those took over the start-up.
         /// </summary>
         bool RunSetup(string[] args)
         {
@@ -75,6 +76,12 @@ namespace ZapretLauncher
             else if (args.Contains("--setup") ||
                      Path.GetFileNameWithoutExtension(exe).EndsWith("Setup", StringComparison.OrdinalIgnoreCase))
             {
+                mode = SetupMode.Install;
+            }
+            else if (!Installer.IsInstalledCopy && !args.Contains("--portable") && !args.Contains("--autostart"))
+            {
+                // A copy that was never installed goes through the wizard first, whatever it is called.
+                // --portable skips that (development, or running it straight from a folder on purpose).
                 mode = SetupMode.Install;
             }
             else return false;
