@@ -1,0 +1,293 @@
+<Window x:Class="ZapretLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Zapret Launcher" Width="440" Height="760"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanMinimize"
+        AllowsTransparency="True" Background="Transparent" UseLayoutRounding="True"
+        FontFamily="Segoe UI Variable Text, Segoe UI">
+
+    <Window.Resources>
+        <!-- Palette: ink background, slate lines, one signal colour for "on" -->
+        <SolidColorBrush x:Key="Ink" Color="#0E161F" />
+        <SolidColorBrush x:Key="Line" Color="#1E2A36" />
+        <SolidColorBrush x:Key="Text" Color="#E8EEF4" />
+        <SolidColorBrush x:Key="Muted" Color="#8697A8" />
+        <SolidColorBrush x:Key="Faint" Color="#5E7083" />
+        <SolidColorBrush x:Key="Signal" Color="#3DD6C3" />
+
+        <!-- Invisible button laid over the power disc -->
+        <Style x:Key="Ghost" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" CornerRadius="999">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary action -->
+        <Style x:Key="Pill" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="#2A3A4A" BorderThickness="1"
+                                CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#17222D" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A4F63" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Window buttons -->
+        <Style x:Key="TitleBtn" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A2632" />
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Strategy rows: selected row gets a signal bar on the left -->
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" CornerRadius="8" Padding="0,9,10,9" Margin="0,1,8,1" Background="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="18" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="Bar" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left"
+                                        Margin="2,0,0,0" Background="{StaticResource Signal}" Visibility="Hidden" />
+                                <ContentPresenter Grid.Column="1" TextElement.FontSize="13.5" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#131E29" />
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#14232E" />
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Switch -->
+        <Style x:Key="Switch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <Border x:Name="Track" Grid.Column="1" Width="40" Height="22" CornerRadius="11" Background="#26343F">
+                                <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="#C9D4DE" HorizontalAlignment="Left" Margin="3,0,0,0" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource Signal}" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#0E161F" />
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Shadow layer kept separate so the content text stays crisp -->
+        <Border Margin="12" CornerRadius="18" Background="{StaticResource Ink}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.55" />
+            </Border.Effect>
+        </Border>
+
+        <Border Margin="12" CornerRadius="18" Background="{StaticResource Ink}"
+                BorderBrush="{StaticResource Line}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Title bar -->
+                <Grid x:Name="TitleBar" Grid.Row="0" Height="48" Background="Transparent"
+                      MouseLeftButtonDown="TitleBar_MouseDown">
+                    <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Zapret" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text=" Launcher" FontSize="15" Foreground="{StaticResource Faint}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click" />
+                        <Button Style="{StaticResource TitleBtn}" Content="&#xE8BB;" Click="Close_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Power disc and status -->
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,6,0,14">
+                    <Grid x:Name="HeroGrid" Width="176" Height="176" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="HeroScale" ScaleX="1" ScaleY="1" />
+                        </Grid.RenderTransform>
+
+                        <Ellipse x:Name="Disc" Width="140" Height="140">
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#16212C" />
+                            </Ellipse.Fill>
+                            <Ellipse.Effect>
+                                <DropShadowEffect x:Name="GlowFx" Color="#5E7083" BlurRadius="50" ShadowDepth="0" Opacity="0" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <Ellipse x:Name="Ring" Width="140" Height="140" StrokeThickness="3">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#2C3B4A" />
+                            </Ellipse.Stroke>
+                        </Ellipse>
+                        <Viewbox Width="52" Height="52" IsHitTestVisible="False">
+                            <Canvas Width="24" Height="24">
+                                <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
+                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                    <Path.Stroke>
+                                        <SolidColorBrush Color="#8697A8" />
+                                    </Path.Stroke>
+                                </Path>
+                            </Canvas>
+                        </Viewbox>
+                        <Button x:Name="PowerButton" Style="{StaticResource Ghost}" Width="140" Height="140"
+                                Click="Power_Click" MouseEnter="PowerButton_Enter" MouseLeave="PowerButton_Leave" />
+                    </Grid>
+
+                    <TextBlock x:Name="StatusText" Text="Отключено" FontSize="26" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                    <TextBlock x:Name="SubText" Text="Нажмите, чтобы включить" FontSize="13"
+                               HorizontalAlignment="Center" Margin="0,4,0,0" Foreground="{StaticResource Muted}" />
+                </StackPanel>
+
+                <!-- Strategy list -->
+                <Grid Grid.Row="2" Margin="24,0,16,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.RowSpan="2" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,0,8,0" />
+
+                    <Grid Margin="0,14,8,6">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Стратегия обхода" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Если сайты не открываются, выберите другую" FontSize="12"
+                                       Foreground="{StaticResource Faint}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button x:Name="AutoButton" Content="Автоподбор" Style="{StaticResource Pill}"
+                                HorizontalAlignment="Right" Click="Auto_Click" />
+                    </Grid>
+
+                    <ListBox x:Name="StrategyList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             SelectionChanged="Strategy_Changed" />
+                </Grid>
+
+                <!-- Options -->
+                <StackPanel Grid.Row="3" Margin="24,0,24,0">
+                    <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,4,0,0" />
+                    <CheckBox x:Name="GameToggle" Style="{StaticResource Switch}" Click="Game_Click" Margin="0,12,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Игровой фильтр" FontSize="14" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Обход для игровых портов 1024–65535" FontSize="12"
+                                       Foreground="{StaticResource Faint}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </CheckBox>
+                    <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" />
+                    <CheckBox x:Name="AutostartToggle" Style="{StaticResource Switch}" Click="Autostart_Click" Margin="0,12,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
+                                       Foreground="{StaticResource Faint}" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+
+                <!-- Footer -->
+                <StackPanel Grid.Row="4" Margin="24,0,24,20">
+                    <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,0,0,12" />
+                    <ProgressBar x:Name="DownloadBar" Height="3" Visibility="Collapsed" Minimum="0" Maximum="100"
+                                 Background="#1E2A36" Foreground="{StaticResource Signal}" BorderThickness="0"
+                                 Margin="0,0,0,10" />
+                    <Grid>
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="240">
+                            <TextBlock x:Name="VersionText" FontSize="12" Foreground="{StaticResource Muted}" />
+                            <TextBlock x:Name="LogText" FontSize="12" Foreground="{StaticResource Faint}"
+                                       TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button x:Name="UpdateButton" Content="Обновить" Style="{StaticResource Pill}"
+                                    Click="Update_Click" Margin="0,0,8,0" />
+                            <Button Content="Папка" Style="{StaticResource Pill}" Click="Folder_Click" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
