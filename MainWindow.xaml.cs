@@ -59,17 +59,17 @@ namespace ZapretLauncher
         readonly bool _autostartLaunch;
 
         System.Windows.Forms.NotifyIcon _tray;
-        System.Windows.Forms.ToolStripItem _trayToggle;
         List<Strategy> _strategies = new List<Strategy>();
         CancellationTokenSource _cts;
         UiState _state = UiState.Idle;
         bool _suppress, _exiting, _balloonShown, _cleaned;
         string _runningName = "";
 
-        public MainWindow(bool autostartLaunch)
+        public MainWindow(bool autostartLaunch, SetupMode setup = SetupMode.None, string setupDir = null)
         {
             _autostartLaunch = autostartLaunch;
             InitializeComponent();
+            if (setup != SetupMode.None) StartSetup(setup, setupDir);
 
             var work = SystemParameters.WorkArea;
             if (Height > work.Height) Height = work.Height - 20;
@@ -89,7 +89,7 @@ namespace ZapretLauncher
             IsVisibleChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
             StateChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
 
-            SetupTray();
+            if (_setup == SetupMode.None) SetupTray();   // the wizard has no tray icon
         }
 
         [DllImport("dwmapi.dll")]
@@ -464,23 +464,28 @@ namespace ZapretLauncher
 
         void SetupTray()
         {
-            var menu = new System.Windows.Forms.ContextMenuStrip();
-            menu.Items.Add("Открыть", null, (s, e) => ShowFromTray());
-            _trayToggle = menu.Items.Add("Включить", null,
-                (s, e) => Dispatcher.BeginInvoke(new Action(() => Power_Click(null, null))));
-            menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            menu.Items.Add("Выход", null, (s, e) => ExitApp());
-
             _tray = new System.Windows.Forms.NotifyIcon
             {
-                ContextMenuStrip = menu,
                 Text = "Zapret Launcher",
                 Visible = true
             };
             _tray.MouseClick += (s, e) =>
             {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left) ShowFromTray();
+                else if (e.Button == System.Windows.Forms.MouseButtons.Right) ShowTrayMenu();
             };
+        }
+
+        void ShowTrayMenu()
+        {
+            var menu = new TrayMenu();
+            menu.Add("Открыть", true, ShowFromTray);
+            menu.Add(_state == UiState.Running ? "Выключить" : "Включить",
+                _state == UiState.Idle || _state == UiState.Running || _state == UiState.Missing,
+                () => Power_Click(null, null));
+            menu.AddSeparator();
+            menu.Add("Выход", true, ExitApp);
+            menu.Popup();
         }
 
         public void ShowFromTray()
@@ -545,9 +550,6 @@ namespace ZapretLauncher
             _tray.Icon = icon;
             if (old != null) old.Dispose();
             _tray.Text = ("Zapret Launcher — " + title).Substring(0, Math.Min(63, ("Zapret Launcher — " + title).Length));
-
-            _trayToggle.Text = st == UiState.Running ? "Выключить" : "Включить";
-            _trayToggle.Enabled = st == UiState.Idle || st == UiState.Running || st == UiState.Missing;
         }
 
         void Tint(Color color, Color disc, double glow, bool pulse)
@@ -955,8 +957,10 @@ namespace ZapretLauncher
         // -------------------------------------------------------- closing
         protected override void OnClosing(CancelEventArgs e)
         {
+            if (_setupBusy) { e.Cancel = true; return; }   // not in the middle of copying files
+
             // With "close to tray" on, the close button only hides the window; Exit in the tray menu quits.
-            if (!_exiting && _s.CloseToTray)
+            if (!_exiting && _s.CloseToTray && _setup == SetupMode.None)
             {
                 e.Cancel = true;
                 Hide();
@@ -983,6 +987,7 @@ namespace ZapretLauncher
         {
             if (_cleaned) return;
             _cleaned = true;
+            if (_setup != SetupMode.None) { SetupCleanup(); return; }   // the wizard must not stop a running bypass
             try { _tray.Visible = false; _tray.Dispose(); } catch { }
             _runner.Stop();
         }

@@ -91,6 +91,53 @@
             </Setter>
         </Style>
 
+        <!-- Primary action (setup wizard) -->
+        <Style x:Key="PillSolid" TargetType="Button" BasedOn="{StaticResource Pill}">
+            <Setter Property="Foreground" Value="#0A0A0A" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#DEDEDE" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Text field (setup wizard) -->
+        <Style x:Key="Field" TargetType="TextBox">
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+            <Setter Property="SelectionBrush" Value="#FFFFFF" />
+            <Setter Property="SelectionOpacity" Value="0.3" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd" Background="#14FFFFFF" BorderBrush="{StaticResource Edge}" BorderThickness="1" CornerRadius="9">
+                            <ScrollViewer x:Name="PART_ContentHost" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#66FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Compact pill for the footer tray -->
         <Style x:Key="PillSmall" TargetType="Button" BasedOn="{StaticResource Pill}">
             <Setter Property="FontSize" Value="11.5" />
@@ -137,6 +184,29 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#1FFFFFFF" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Strategy list. The stock template paints a disabled list white; this one just dims it -->
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <ScrollViewer x:Name="Scroll" Focusable="False" Padding="{TemplateBinding Padding}"
+                                      HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                      VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                      CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Scroll" Property="Opacity" Value="0.4" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -192,20 +262,58 @@
                                 <Grid.RenderTransform>
                                     <TranslateTransform />
                                 </Grid.RenderTransform>
-                                <Ellipse x:Name="Halo" Width="116" Height="96" Margin="-38,-37" Opacity="0" IsHitTestVisible="False">
-                                    <Ellipse.Fill>
-                                        <RadialGradientBrush>
-                                            <GradientStop Color="#99FFFFFF" Offset="0" />
-                                            <GradientStop Color="#5CFFFFFF" Offset="0.3" />
-                                            <GradientStop Color="#2BFFFFFF" Offset="0.55" />
-                                            <GradientStop Color="#0FFFFFFF" Offset="0.8" />
-                                            <GradientStop Color="#00FFFFFF" Offset="1" />
-                                        </RadialGradientBrush>
-                                    </Ellipse.Fill>
-                                </Ellipse>
-                                <Border x:Name="Track" CornerRadius="11" Background="#2EFFFFFF">
-                                    <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="#CFCFCF" HorizontalAlignment="Left" Margin="3,0,0,0" />
-                                </Border>
+                                <!-- Halo: a soft grey ellipse with the track cut out of it, so it only shows around the switch -->
+                                <Canvas IsHitTestVisible="False">
+                                    <Path x:Name="Halo" Opacity="0">
+                                        <Path.Data>
+                                            <CombinedGeometry GeometryCombineMode="Exclude">
+                                                <CombinedGeometry.Geometry1>
+                                                    <EllipseGeometry Center="20,11" RadiusX="58" RadiusY="48" />
+                                                </CombinedGeometry.Geometry1>
+                                                <CombinedGeometry.Geometry2>
+                                                    <RectangleGeometry Rect="0,0,40,22" RadiusX="11" RadiusY="11" />
+                                                </CombinedGeometry.Geometry2>
+                                            </CombinedGeometry>
+                                        </Path.Data>
+                                        <Path.Fill>
+                                            <RadialGradientBrush>
+                                                <GradientStop Color="#70909090" Offset="0" />
+                                                <GradientStop Color="#45909090" Offset="0.3" />
+                                                <GradientStop Color="#20909090" Offset="0.55" />
+                                                <GradientStop Color="#0A909090" Offset="0.8" />
+                                                <GradientStop Color="#00909090" Offset="1" />
+                                            </RadialGradientBrush>
+                                        </Path.Fill>
+                                    </Path>
+                                </Canvas>
+                                <!-- The track has a round hole where the thumb sits, so the thumb is the card's own
+                                     frosted glass showing through; one track per position -->
+                                <Path x:Name="TrackOff" Fill="#1FFFFFFF">
+                                    <Path.Data>
+                                        <CombinedGeometry GeometryCombineMode="Exclude">
+                                            <CombinedGeometry.Geometry1>
+                                                <RectangleGeometry Rect="0,0,40,22" RadiusX="11" RadiusY="11" />
+                                            </CombinedGeometry.Geometry1>
+                                            <CombinedGeometry.Geometry2>
+                                                <EllipseGeometry Center="11,11" RadiusX="8" RadiusY="8" />
+                                            </CombinedGeometry.Geometry2>
+                                        </CombinedGeometry>
+                                    </Path.Data>
+                                </Path>
+                                <Path x:Name="TrackOn" Fill="#A3A3A3" Visibility="Collapsed">
+                                    <Path.Data>
+                                        <CombinedGeometry GeometryCombineMode="Exclude">
+                                            <CombinedGeometry.Geometry1>
+                                                <RectangleGeometry Rect="0,0,40,22" RadiusX="11" RadiusY="11" />
+                                            </CombinedGeometry.Geometry1>
+                                            <CombinedGeometry.Geometry2>
+                                                <EllipseGeometry Center="29,11" RadiusX="8" RadiusY="8" />
+                                            </CombinedGeometry.Geometry2>
+                                        </CombinedGeometry>
+                                    </Path.Data>
+                                </Path>
+                                <Ellipse x:Name="Thumb" Width="16" Height="16"
+                                         HorizontalAlignment="Left" Margin="3,0,0,0" />
                             </Grid>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -214,7 +322,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
-                                            <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-3" Duration="0:0:0.2">
+                                            <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-2" Duration="0:0:0.2">
                                                 <DoubleAnimation.EasingFunction>
                                                     <CubicEase EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
@@ -236,8 +344,8 @@
                                 </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{StaticResource Signal}" />
-                                <Setter TargetName="Thumb" Property="Fill" Value="#0A0A0A" />
+                                <Setter TargetName="TrackOff" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="TrackOn" Property="Visibility" Value="Visible" />
                                 <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
                                 <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0" />
                             </Trigger>
@@ -271,7 +379,7 @@
             <Rectangle Fill="{StaticResource Veil}" />
         </Grid>
 
-        <Grid>
+        <Grid x:Name="MainView">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -350,8 +458,7 @@
                                 HorizontalAlignment="Right" VerticalAlignment="Center" Click="Auto_Click" />
                     </Grid>
 
-                    <ListBox x:Name="StrategyList" Grid.Row="1" Background="Transparent" BorderThickness="0"
-                             Margin="6,0,6,8"
+                    <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.CanContentScroll="False" Padding="0"
                              TextOptions.TextHintingMode="Fixed"
@@ -472,6 +579,107 @@
                     </Button>
                 </Grid>
             </StackPanel>
+        </Grid>
+
+        <!-- Setup wizard: replaces the main view when the exe runs as the installer or uninstaller (Setup.cs) -->
+        <Grid x:Name="SetupView" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Height="44" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseDown">
+                <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Zapret" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text=" Launcher" FontSize="15" Foreground="{StaticResource Faint}" />
+                    <TextBlock x:Name="SetupCaption" FontSize="15" Foreground="{StaticResource Faint}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click" />
+                    <Button Style="{StaticResource TitleBtn}" Content="&#xE8BB;" Click="Close_Click" />
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1" Style="{StaticResource Card}" Margin="24,4,24,14" Padding="30,26">
+                <Grid>
+                    <StackPanel x:Name="PageWelcome">
+                        <TextBlock Text="Установка Zapret Launcher" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,14,0,0"
+                                   Text="Мастер установит лаунчер, создаст ярлыки и сразу скачает компоненты zapret. После этого обход блокировок включается одной кнопкой." />
+                        <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,0"
+                                   Text="Удалить программу потом можно через «Установка и удаление программ» в параметрах Windows." />
+                        <TextBlock x:Name="SetupVersion" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,22,0,0" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="PageOptions" Visibility="Collapsed">
+                        <TextBlock Text="Куда установить" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SetupPath" Style="{StaticResource Field}" />
+                            <Button Grid.Column="1" Content="Обзор…" Style="{StaticResource Pill}" Margin="8,0,0,0" Click="SetupBrowse_Click" />
+                        </Grid>
+                        <TextBlock x:Name="SetupPathError" FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" Margin="0,6,0,0" />
+                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,12,0,0" />
+                        <CheckBox x:Name="SetupDesktop" Style="{StaticResource Switch}" IsChecked="True" Margin="0,16,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Ярлык на рабочем столе" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="В меню «Пуск» ярлык появится в любом случае" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" />
+                        <CheckBox x:Name="SetupAutostart" Style="{StaticResource Switch}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PageWorking" Visibility="Collapsed" VerticalAlignment="Center">
+                        <TextBlock x:Name="SetupDoing" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock x:Name="SetupStatus" FontSize="14" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,12,0,18" />
+                        <ProgressBar x:Name="SetupBar" Height="3" Minimum="0" Maximum="100" BorderThickness="0"
+                                     Background="#24FFFFFF" Foreground="{StaticResource Signal}" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="PageDone" Visibility="Collapsed">
+                        <TextBlock x:Name="SetupDoneTitle" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock x:Name="SetupDoneText" FontSize="14" LineHeight="22" TextWrapping="Wrap"
+                                   Foreground="{StaticResource Muted}" Margin="0,14,0,0" />
+                        <CheckBox x:Name="SetupLaunch" Style="{StaticResource Switch}" IsChecked="True" Margin="0,24,0,0">
+                            <TextBlock Text="Запустить Zapret Launcher" FontSize="14" Foreground="{StaticResource Text}" />
+                        </CheckBox>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PageRemove" Visibility="Collapsed">
+                        <TextBlock Text="Удалить Zapret Launcher?" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,14,0,0"
+                                   Text="Будут удалены лаунчер, ярлыки, автозапуск и скачанные компоненты zapret. Если обход сейчас включён, он остановится." />
+                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,20,0,0" />
+                        <CheckBox x:Name="SetupKeep" Style="{StaticResource Switch}" IsChecked="True" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Сохранить мои настройки" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Выбранная стратегия, переключатели и ваши списки *user*.txt — на случай повторной установки"
+                                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2" Margin="24,0,24,20">
+                <TextBlock x:Name="SetupStep" FontSize="12" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="SetupBack" Style="{StaticResource Pill}" Padding="18,8" Margin="0,0,8,0" Click="SetupBack_Click" />
+                    <Button x:Name="SetupNext" Style="{StaticResource PillSolid}" Padding="18,8" Click="SetupNext_Click" />
+                </StackPanel>
+            </Grid>
         </Grid>
 
         <!-- Hint for the hovered button. It floats above the content, so it carries its own piece of the

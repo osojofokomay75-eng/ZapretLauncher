@@ -30,4 +30,9 @@
     <EmbeddedResource Include="app-off.ico" LogicalName="app-off.ico" />
   </ItemGroup>
 
+  <!-- The installer is this same exe under another name: started as *Setup.exe it runs the setup wizard -->
+  <Target Name="CopySetup" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(TargetDir)ZapretLauncherSetup.exe" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

@@ -448,7 +448,7 @@ namespace ZapretLauncher
         /// Creates (or removes) a scheduled task that starts the launcher at logon with highest
         /// privileges, so Windows does not show a UAC prompt on every boot.
         /// </summary>
-        public static void Set(bool on)
+        public static void Set(bool on, string exe = null)
         {
             if (!on)
             {
@@ -456,7 +456,7 @@ namespace ZapretLauncher
                 return;
             }
 
-            string exe = Process.GetCurrentProcess().MainModule.FileName;
+            if (exe == null) exe = Process.GetCurrentProcess().MainModule.FileName;
             string user = WindowsIdentity.GetCurrent().Name;
 
             string xml =
