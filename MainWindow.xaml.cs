@@ -11,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 
 namespace ZapretLauncher
 {
@@ -113,28 +114,28 @@ namespace ZapretLauncher
             {
                 case UiState.Missing:
                     title = "Нужна установка"; subtitle = "Нажмите, чтобы скачать компоненты zapret";
-                    color = Hex("#6AA7FF"); disc = Hex("#141F33"); glow = 0.3; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#161616"); glow = 0.3; break;
                 case UiState.Installing:
                     title = "Загрузка…"; subtitle = "Скачиваю и распаковываю zapret";
-                    color = Hex("#6AA7FF"); disc = Hex("#141F33"); pulse = true; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#161616"); pulse = true; break;
                 case UiState.Starting:
                     title = "Запуск…"; subtitle = "Подождите секунду";
-                    color = Hex("#F2B544"); disc = Hex("#2A2314"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#1C1C1C"); pulse = true; break;
                 case UiState.Testing:
                     title = "Подбор стратегии"; subtitle = "Нажмите, чтобы отменить";
-                    color = Hex("#F2B544"); disc = Hex("#2A2314"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#1C1C1C"); pulse = true; break;
                 case UiState.Running:
                     title = "Работает"; subtitle = "Обход блокировок включён";
-                    color = Hex("#3DD6C3"); disc = Hex("#10282A"); glow = 0.55; break;
+                    color = Hex("#FFFFFF"); disc = Hex("#222222"); glow = 0.55; break;
                 default:
                     title = "Отключено"; subtitle = "Нажмите, чтобы включить";
-                    color = Hex("#5E7083"); disc = Hex("#16212C"); break;
+                    color = Hex("#6B6B6B"); disc = Hex("#161616"); break;
             }
             if (sub != null) subtitle = sub;
 
             StatusText.Text = title;
             SubText.Text = subtitle;
-            StatusText.Foreground = new SolidColorBrush(st == UiState.Running ? color : Hex("#E8EEF4"));
+            StatusText.Foreground = new SolidColorBrush(st == UiState.Running ? color : Hex("#F2F2F2"));
             Tint(color, disc, glow, pulse);
 
             bool locked = st == UiState.Installing || st == UiState.Starting || st == UiState.Testing;
@@ -442,6 +443,49 @@ namespace ZapretLauncher
             var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(160)) { EasingFunction = new QuadraticEase() };
             HeroScale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
             HeroScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+        }
+
+        // The list scrolls by pixels; the wheel eases towards a target offset instead of jumping.
+        static readonly DependencyProperty ListOffsetProperty = DependencyProperty.Register(
+            "ListOffset", typeof(double), typeof(MainWindow), new PropertyMetadata(0.0, (d, e) =>
+            {
+                var w = (MainWindow)d;
+                if (w._listScroll != null) w._listScroll.ScrollToVerticalOffset((double)e.NewValue);
+            }));
+
+        System.Windows.Controls.ScrollViewer _listScroll;
+        double _scrollTarget;
+        bool _scrolling;
+
+        static T FindChild<T>(DependencyObject root) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                var hit = child as T ?? FindChild<T>(child);
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+
+        void StrategyList_Wheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_listScroll == null) _listScroll = FindChild<System.Windows.Controls.ScrollViewer>(StrategyList);
+            if (_listScroll == null) return;
+            e.Handled = true;
+
+            // Start from where the list really is unless a wheel animation is still in flight.
+            if (!_scrolling) _scrollTarget = _listScroll.VerticalOffset;
+            _scrollTarget = Math.Max(0, Math.Min(_listScroll.ScrollableHeight, _scrollTarget - e.Delta * 0.8));
+
+            var a = new DoubleAnimation(_listScroll.VerticalOffset, _scrollTarget, TimeSpan.FromMilliseconds(260))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            double target = _scrollTarget;
+            a.Completed += (s, ev) => { if (target == _scrollTarget) _scrolling = false; };
+            _scrolling = true;
+            BeginAnimation(ListOffsetProperty, a);
         }
 
         void Folder_Click(object sender, RoutedEventArgs e)

@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
 
-        <!-- Thin, quiet scrollbar -->
+        <!-- Hairline, translucent scrollbar; the bar itself stays wide enough to grab -->
         <Style TargetType="ScrollBar">
             <Setter Property="Width" Value="6" />
             <Setter Property="Background" Value="Transparent" />
@@ -16,7 +16,18 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Background="#2C3B4A" CornerRadius="3" Margin="1,0" />
+                                                <Grid Background="Transparent">
+                                                    <Border x:Name="Bd" Width="2" HorizontalAlignment="Right" CornerRadius="1"
+                                                            Background="#FFFFFF" Opacity="0.18" />
+                                                </Grid>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.4" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="Bd" Property="Opacity" Value="0.55" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
