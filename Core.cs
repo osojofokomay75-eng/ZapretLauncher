@@ -519,35 +519,32 @@ namespace ZapretLauncher
     }
 
     // --------------------------------------------------------------- icons
-    /// <summary>Draws the tray / window icon at runtime, so the exe needs no resource files.</summary>
+    /// <summary>
+    /// Tray icons: the application icon while the bypass is on, a greyed copy of it while it is off.
+    /// </summary>
     public static class IconFactory
     {
         [DllImport("user32.dll")]
+        static extern IntPtr LoadImage(IntPtr instance, IntPtr name, uint type, int cx, int cy, uint flags);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        static extern IntPtr GetModuleHandle(string name);
+        [DllImport("user32.dll")]
         static extern bool DestroyIcon(IntPtr handle);
 
-        public static Drawing.Icon Make(Drawing.Color color)
+        public static Drawing.Icon Tray(bool on)
         {
-            using (var bmp = new Drawing.Bitmap(32, 32))
+            var size = System.Windows.Forms.SystemInformation.SmallIconSize;
+            if (!on)
             {
-                using (var g = Drawing.Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    g.Clear(Drawing.Color.Transparent);
-                    using (var brush = new Drawing.SolidBrush(color))
-                        g.FillEllipse(brush, 1, 1, 30, 30);
-                    using (var pen = new Drawing.Pen(color.GetBrightness() > 0.6f ? Drawing.Color.Black : Drawing.Color.White, 3f))
-                    {
-                        pen.StartCap = Drawing.Drawing2D.LineCap.Round;
-                        pen.EndCap = Drawing.Drawing2D.LineCap.Round;
-                        g.DrawArc(pen, 9, 9, 14, 14, -55, 290);
-                        g.DrawLine(pen, 16, 7, 16, 15);
-                    }
-                }
-
-                IntPtr h = bmp.GetHicon();
-                try { return (Drawing.Icon)Drawing.Icon.FromHandle(h).Clone(); }
-                finally { DestroyIcon(h); }
+                using (var s = typeof(IconFactory).Assembly.GetManifestResourceStream("app-off.ico"))
+                    return new Drawing.Icon(s, size);
             }
+
+            // "On" is the exe's own icon (app.ico); the compiler stores it under resource id 32512.
+            IntPtr h = LoadImage(GetModuleHandle(null), (IntPtr)32512, 1 /* IMAGE_ICON */, size.Width, size.Height, 0);
+            if (h == IntPtr.Zero) return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
+            try { return (Drawing.Icon)Drawing.Icon.FromHandle(h).Clone(); }
+            finally { DestroyIcon(h); }
         }
     }
 }

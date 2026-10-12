@@ -539,13 +539,12 @@ namespace ZapretLauncher
             UpdateButton.IsEnabled = !locked;
             PowerButton.IsEnabled = st != UiState.Installing && st != UiState.Starting;
 
-            // tray + window icon follow the state
-            var icon = IconFactory.Make(System.Drawing.Color.FromArgb(color.R, color.G, color.B));
+            // the tray icon shows on / off; the window keeps the application icon (app.ico)
+            var icon = IconFactory.Tray(st == UiState.Running);
             var old = _tray.Icon;
             _tray.Icon = icon;
             if (old != null) old.Dispose();
             _tray.Text = ("Zapret Launcher — " + title).Substring(0, Math.Min(63, ("Zapret Launcher — " + title).Length));
-            Icon = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
 
             _trayToggle.Text = st == UiState.Running ? "Выключить" : "Включить";
             _trayToggle.Enabled = st == UiState.Idle || st == UiState.Running || st == UiState.Missing;

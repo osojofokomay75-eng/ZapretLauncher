@@ -13,6 +13,7 @@
     <RootNamespace>ZapretLauncher</RootNamespace>
     <Version>1.0.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <DebugType>none</DebugType>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
@@ -22,6 +23,11 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tray icon for "bypass off"; the "on" icon is app.ico itself -->
+    <EmbeddedResource Include="app-off.ico" LogicalName="app-off.ico" />
   </ItemGroup>
 
 </Project>
