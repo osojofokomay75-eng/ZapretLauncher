@@ -507,7 +507,7 @@ namespace ZapretLauncher
                     g.Clear(Drawing.Color.Transparent);
                     using (var brush = new Drawing.SolidBrush(color))
                         g.FillEllipse(brush, 1, 1, 30, 30);
-                    using (var pen = new Drawing.Pen(Drawing.Color.White, 3f))
+                    using (var pen = new Drawing.Pen(color.GetBrightness() > 0.6f ? Drawing.Color.Black : Drawing.Color.White, 3f))
                     {
                         pen.StartCap = Drawing.Drawing2D.LineCap.Round;
                         pen.EndCap = Drawing.Drawing2D.LineCap.Round;

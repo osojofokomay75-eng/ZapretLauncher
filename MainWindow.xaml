@@ -7,13 +7,13 @@
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
     <Window.Resources>
-        <!-- Palette: ink background, slate lines, one signal colour for "on" -->
-        <SolidColorBrush x:Key="Ink" Color="#0E161F" />
-        <SolidColorBrush x:Key="Line" Color="#1E2A36" />
-        <SolidColorBrush x:Key="Text" Color="#E8EEF4" />
-        <SolidColorBrush x:Key="Muted" Color="#8697A8" />
-        <SolidColorBrush x:Key="Faint" Color="#5E7083" />
-        <SolidColorBrush x:Key="Signal" Color="#3DD6C3" />
+        <!-- Palette: black background, grey lines, white for "on" -->
+        <SolidColorBrush x:Key="Ink" Color="#0A0A0A" />
+        <SolidColorBrush x:Key="Line" Color="#222222" />
+        <SolidColorBrush x:Key="Text" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="Muted" Color="#9A9A9A" />
+        <SolidColorBrush x:Key="Faint" Color="#6B6B6B" />
+        <SolidColorBrush x:Key="Signal" Color="#FFFFFF" />
 
         <!-- Invisible button laid over the power disc -->
         <Style x:Key="Ghost" TargetType="Button">
@@ -40,14 +40,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="Transparent" BorderBrush="#2A3A4A" BorderThickness="1"
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="#2E2E2E" BorderThickness="1"
                                 CornerRadius="9" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#17222D" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A4F63" />
+                                <Setter TargetName="Bd" Property="Background" Value="#171717" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#474747" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4" />
@@ -75,7 +75,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1A2632" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1C1C1C" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -105,11 +105,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#131E29" />
+                                <Setter TargetName="Bd" Property="Background" Value="#141414" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#14232E" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1C1C1C" />
                                 <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                             </Trigger>
@@ -132,14 +132,14 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ContentPresenter VerticalAlignment="Center" Margin="0,0,16,0" />
-                            <Border x:Name="Track" Grid.Column="1" Width="40" Height="22" CornerRadius="11" Background="#26343F">
-                                <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="#C9D4DE" HorizontalAlignment="Left" Margin="3,0,0,0" />
+                            <Border x:Name="Track" Grid.Column="1" Width="40" Height="22" CornerRadius="11" Background="#2A2A2A">
+                                <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="#CFCFCF" HorizontalAlignment="Left" Margin="3,0,0,0" />
                             </Border>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{StaticResource Signal}" />
-                                <Setter TargetName="Thumb" Property="Fill" Value="#0E161F" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#0A0A0A" />
                                 <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
                                 <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0" />
                             </Trigger>
@@ -194,15 +194,15 @@
 
                         <Ellipse x:Name="Disc" Width="140" Height="140">
                             <Ellipse.Fill>
-                                <SolidColorBrush Color="#16212C" />
+                                <SolidColorBrush Color="#161616" />
                             </Ellipse.Fill>
                             <Ellipse.Effect>
-                                <DropShadowEffect x:Name="GlowFx" Color="#5E7083" BlurRadius="50" ShadowDepth="0" Opacity="0" />
+                                <DropShadowEffect x:Name="GlowFx" Color="#6B6B6B" BlurRadius="50" ShadowDepth="0" Opacity="0" />
                             </Ellipse.Effect>
                         </Ellipse>
                         <Ellipse x:Name="Ring" Width="140" Height="140" StrokeThickness="3">
                             <Ellipse.Stroke>
-                                <SolidColorBrush Color="#2C3B4A" />
+                                <SolidColorBrush Color="#333333" />
                             </Ellipse.Stroke>
                         </Ellipse>
                         <Viewbox Width="52" Height="52" IsHitTestVisible="False">
@@ -210,7 +210,7 @@
                                 <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
                                       StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
                                     <Path.Stroke>
-                                        <SolidColorBrush Color="#8697A8" />
+                                        <SolidColorBrush Color="#9A9A9A" />
                                     </Path.Stroke>
                                 </Path>
                             </Canvas>
@@ -245,6 +245,8 @@
 
                     <ListBox x:Name="StrategyList" Grid.Row="1" Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.CanContentScroll="False" Padding="0"
+                             PreviewMouseWheel="StrategyList_Wheel"
                              SelectionChanged="Strategy_Changed" />
                 </Grid>
 
@@ -272,7 +274,7 @@
                 <StackPanel Grid.Row="4" Margin="24,0,24,20">
                     <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,0,0,12" />
                     <ProgressBar x:Name="DownloadBar" Height="3" Visibility="Collapsed" Minimum="0" Maximum="100"
-                                 Background="#1E2A36" Foreground="{StaticResource Signal}" BorderThickness="0"
+                                 Background="#222222" Foreground="{StaticResource Signal}" BorderThickness="0"
                                  Margin="0,0,0,10" />
                     <Grid>
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="240">
