@@ -34,6 +34,7 @@ namespace ZapretLauncher
         public string Strategy = "general";
         public bool GameFilter;
         public bool Autostart;
+        public bool CloseToTray = true;
 
         public static Settings Load()
         {
@@ -51,6 +52,7 @@ namespace ZapretLauncher
                         case "strategy": s.Strategy = v; break;
                         case "gamefilter": s.GameFilter = v == "1"; break;
                         case "autostart": s.Autostart = v == "1"; break;
+                        case "closetotray": s.CloseToTray = v == "1"; break;
                     }
                 }
             }
@@ -68,6 +70,7 @@ namespace ZapretLauncher
                     "strategy=" + Strategy,
                     "gamefilter=" + (GameFilter ? "1" : "0"),
                     "autostart=" + (Autostart ? "1" : "0"),
+                    "closetotray=" + (CloseToTray ? "1" : "0"),
                 });
             }
             catch { }
@@ -166,6 +169,31 @@ namespace ZapretLauncher
                 .Select(f => new Strategy { Name = Path.GetFileNameWithoutExtension(f), BatPath = f })
                 .OrderBy(s => NaturalKey(s.Name))
                 .ToList();
+        }
+
+        /// <summary>
+        /// Creates the user list files with the same placeholders service.bat writes
+        /// (winws treats an empty list as "match everything"). Returns the lists folder.
+        /// </summary>
+        public static string EnsureUserLists()
+        {
+            var root = FindRoot();
+            if (root == null) return null;
+            string lists = Path.Combine(root, "lists");
+            Directory.CreateDirectory(lists);
+
+            var defaults = new Dictionary<string, string>
+            {
+                { "list-general-user.txt", "# Never leave this file empty\r\ndomain.example.abc\r\n" },
+                { "list-exclude-user.txt", "domain.example.abc\r\n" },
+                { "ipset-exclude-user.txt", "203.0.113.113/32\r\n" },
+            };
+            foreach (var d in defaults)
+            {
+                string path = Path.Combine(lists, d.Key);
+                if (!File.Exists(path)) File.WriteAllText(path, d.Value, new UTF8Encoding(false));
+            }
+            return lists;
         }
 
         static string Rep(string input, string key, string value)
@@ -420,7 +448,7 @@ namespace ZapretLauncher
         /// Creates (or removes) a scheduled task that starts the launcher at logon with highest
         /// privileges, so Windows does not show a UAC prompt on every boot.
         /// </summary>
-        public static void Set(bool on)
+        public static void Set(bool on, string exe = null)
         {
             if (!on)
             {
@@ -428,7 +456,7 @@ namespace ZapretLauncher
                 return;
             }
 
-            string exe = Process.GetCurrentProcess().MainModule.FileName;
+            if (exe == null) exe = Process.GetCurrentProcess().MainModule.FileName;
             string user = WindowsIdentity.GetCurrent().Name;
 
             string xml =
@@ -491,35 +519,32 @@ namespace ZapretLauncher
     }
 
     // --------------------------------------------------------------- icons
-    /// <summary>Draws the tray / window icon at runtime, so the exe needs no resource files.</summary>
+    /// <summary>
+    /// Tray icons: the application icon while the bypass is on, a greyed copy of it while it is off.
+    /// </summary>
     public static class IconFactory
     {
         [DllImport("user32.dll")]
+        static extern IntPtr LoadImage(IntPtr instance, IntPtr name, uint type, int cx, int cy, uint flags);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        static extern IntPtr GetModuleHandle(string name);
+        [DllImport("user32.dll")]
         static extern bool DestroyIcon(IntPtr handle);
 
-        public static Drawing.Icon Make(Drawing.Color color)
+        public static Drawing.Icon Tray(bool on)
         {
-            using (var bmp = new Drawing.Bitmap(32, 32))
+            var size = System.Windows.Forms.SystemInformation.SmallIconSize;
+            if (!on)
             {
-                using (var g = Drawing.Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    g.Clear(Drawing.Color.Transparent);
-                    using (var brush = new Drawing.SolidBrush(color))
-                        g.FillEllipse(brush, 1, 1, 30, 30);
-                    using (var pen = new Drawing.Pen(color.GetBrightness() > 0.6f ? Drawing.Color.Black : Drawing.Color.White, 3f))
-                    {
-                        pen.StartCap = Drawing.Drawing2D.LineCap.Round;
-                        pen.EndCap = Drawing.Drawing2D.LineCap.Round;
-                        g.DrawArc(pen, 9, 9, 14, 14, -55, 290);
-                        g.DrawLine(pen, 16, 7, 16, 15);
-                    }
-                }
-
-                IntPtr h = bmp.GetHicon();
-                try { return (Drawing.Icon)Drawing.Icon.FromHandle(h).Clone(); }
-                finally { DestroyIcon(h); }
+                using (var s = typeof(IconFactory).Assembly.GetManifestResourceStream("app-off.ico"))
+                    return new Drawing.Icon(s, size);
             }
+
+            // "On" is the exe's own icon (app.ico); the compiler stores it under resource id 32512.
+            IntPtr h = LoadImage(GetModuleHandle(null), (IntPtr)32512, 1 /* IMAGE_ICON */, size.Width, size.Height, 0);
+            if (h == IntPtr.Zero) return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
+            try { return (Drawing.Icon)Drawing.Icon.FromHandle(h).Clone(); }
+            finally { DestroyIcon(h); }
         }
     }
 }
