@@ -182,12 +182,47 @@ namespace ZapretLauncher
             CursorAt.Y = _cursorPos.Y;
         }
 
+        const int PressMs = 300, ReleaseMs = 460;
+        DispatcherTimer _releaseTimer;
+        int _pressedAt;
+
+        // A press always plays to the end: on a quick click the release waits until the halo
+        // has shrunk all the way, instead of cutting the animation short.
         void PressCursor(bool down)
         {
             if (down == _pressed) return;
             _pressed = down;
 
-            var time = TimeSpan.FromMilliseconds(down ? 300 : 460);
+            if (_releaseTimer != null) _releaseTimer.Stop();
+            if (down)
+            {
+                _pressedAt = Environment.TickCount;
+                AnimateCursor(true);
+                return;
+            }
+
+            int left = PressMs - unchecked(Environment.TickCount - _pressedAt);
+            if (left <= 0)
+            {
+                AnimateCursor(false);
+                return;
+            }
+            if (_releaseTimer == null)
+            {
+                _releaseTimer = new DispatcherTimer();
+                _releaseTimer.Tick += (s, e) =>
+                {
+                    _releaseTimer.Stop();
+                    if (!_pressed) AnimateCursor(false);
+                };
+            }
+            _releaseTimer.Interval = TimeSpan.FromMilliseconds(left);
+            _releaseTimer.Start();
+        }
+
+        void AnimateCursor(bool down)
+        {
+            var time = TimeSpan.FromMilliseconds(down ? PressMs : ReleaseMs);
             var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
             var glow = new DoubleAnimation(down ? 0.55 : 1, time) { EasingFunction = ease };
             CursorGlowScale.BeginAnimation(ScaleTransform.ScaleXProperty, glow);
