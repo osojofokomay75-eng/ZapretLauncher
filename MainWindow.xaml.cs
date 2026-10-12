@@ -15,6 +15,16 @@ using System.Windows.Media.Imaging;
 
 namespace ZapretLauncher
 {
+    /// <summary>Marks an element as frosted glass; the value is its corner radius.</summary>
+    public static class Glass
+    {
+        public static readonly DependencyProperty RadiusProperty = DependencyProperty.RegisterAttached(
+            "Radius", typeof(double), typeof(Glass), new PropertyMetadata(double.NaN));
+
+        public static double GetRadius(DependencyObject o) { return (double)o.GetValue(RadiusProperty); }
+        public static void SetRadius(DependencyObject o, double value) { o.SetValue(RadiusProperty, value); }
+    }
+
     public partial class MainWindow : Window
     {
         enum UiState { Missing, Installing, Idle, Starting, Testing, Running }
@@ -38,8 +48,119 @@ namespace ZapretLauncher
 
             var work = SystemParameters.WorkArea;
             if (Height > work.Height) Height = work.Height - 20;
+            if (Width > work.Width) Width = work.Width - 20;
+
+            BuildSky();
+            Loaded += (s, e) => { CollectGlass(Shell); UpdateFrost(); Drift(true); };
+            LayoutUpdated += (s, e) => UpdateFrost();
+            IsVisibleChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
+            StateChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
 
             SetupTray();
+        }
+
+        // -------------------------------------------------------------- sky
+        const double SkyW = 1200, SkyH = 800;
+        readonly List<Tuple<TranslateTransform, double>> _drift = new List<Tuple<TranslateTransform, double>>();
+        readonly List<FrameworkElement> _glass = new List<FrameworkElement>();
+        string _frostKey;
+        bool _drifting;
+
+        // Three tiled star layers; the same brushes fill the sharp sky and its blurred copy, so they move as one.
+        void BuildSky()
+        {
+            var rnd = new Random(7);
+            var layers = new[]
+            {
+                new { Count = 320, Min = 0.35, Max = 0.7, Seconds = 520.0 },
+                new { Count = 120, Min = 0.6, Max = 1.0, Seconds = 320.0 },
+                new { Count = 40, Min = 0.9, Max = 1.5, Seconds = 200.0 },
+            };
+            byte[] alpha = { 90, 160, 255 };
+
+            foreach (var l in layers)
+            {
+                var tile = new DrawingGroup();
+                tile.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, SkyW, SkyH))));
+
+                var groups = alpha.Select(a => new GeometryGroup { FillRule = FillRule.Nonzero }).ToArray();
+                for (int i = 0; i < l.Count; i++)
+                {
+                    double r = l.Min + rnd.NextDouble() * (l.Max - l.Min);
+                    var at = new Point(rnd.NextDouble() * SkyW, rnd.NextDouble() * SkyH);
+                    groups[rnd.Next(groups.Length)].Children.Add(new EllipseGeometry(at, r, r));
+                }
+                for (int k = 0; k < groups.Length; k++)
+                    tile.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(alpha[k], 255, 255, 255)), null, groups[k]));
+                tile.Freeze();
+
+                var move = new TranslateTransform();
+                var brush = new DrawingBrush(tile)
+                {
+                    TileMode = TileMode.Tile,
+                    Viewport = new Rect(0, 0, SkyW, SkyH),
+                    ViewportUnits = BrushMappingMode.Absolute,
+                    Viewbox = new Rect(0, 0, SkyW, SkyH),
+                    ViewboxUnits = BrushMappingMode.Absolute,
+                    Transform = move
+                };
+                Sky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = brush });
+                FrostSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = brush });
+                _drift.Add(Tuple.Create(move, l.Seconds));
+            }
+        }
+
+        // The window lives in the tray most of the time, so the sky only moves while it is on screen.
+        void Drift(bool on)
+        {
+            if (on == _drifting) return;
+            _drifting = on;
+            foreach (var d in _drift)
+            {
+                DoubleAnimation a = null;
+                if (on)
+                {
+                    a = new DoubleAnimation(0, -SkyW, TimeSpan.FromSeconds(d.Item2)) { RepeatBehavior = RepeatBehavior.Forever };
+                    Timeline.SetDesiredFrameRate(a, 30);
+                }
+                d.Item1.BeginAnimation(TranslateTransform.XProperty, a);
+            }
+        }
+
+        void CollectGlass(DependencyObject root)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                var fe = child as FrameworkElement;
+                if (fe != null && !double.IsNaN(Glass.GetRadius(fe))) _glass.Add(fe);
+                if (!(child is System.Windows.Controls.ListBox)) CollectGlass(child);
+            }
+        }
+
+        // Cuts the blurred sky down to the shapes of the glass elements, and the shell to the rounded window.
+        void UpdateFrost()
+        {
+            if (_glass.Count == 0) return;
+
+            var shapes = new GeometryGroup { FillRule = FillRule.Nonzero };
+            var key = new System.Text.StringBuilder().Append(Shell.ActualWidth).Append('x').Append(Shell.ActualHeight);
+            foreach (var fe in _glass)
+            {
+                if (!fe.IsVisible || fe.ActualWidth <= 0 || fe.ActualHeight <= 0) continue;
+                Rect r;
+                try { r = fe.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, fe.ActualWidth, fe.ActualHeight)); }
+                catch (InvalidOperationException) { continue; }
+                double radius = Math.Min(Glass.GetRadius(fe), Math.Min(r.Width, r.Height) / 2);
+                shapes.Children.Add(new RectangleGeometry(r, radius, radius));
+                key.Append('|').Append(r).Append('/').Append(radius);
+            }
+
+            if (key.ToString() == _frostKey) return;
+            _frostKey = key.ToString();
+            shapes.Freeze();
+            Frost.Clip = shapes;
+            Shell.Clip = new RectangleGeometry(new Rect(0, 0, Shell.ActualWidth, Shell.ActualHeight), 18, 18);
         }
 
         // ---------------------------------------------------------- startup
@@ -114,22 +235,22 @@ namespace ZapretLauncher
             {
                 case UiState.Missing:
                     title = "Нужна установка"; subtitle = "Нажмите, чтобы скачать компоненты zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#161616"); glow = 0.3; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#14FFFFFF"); glow = 0.3; break;
                 case UiState.Installing:
                     title = "Загрузка…"; subtitle = "Скачиваю и распаковываю zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#161616"); pulse = true; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#14FFFFFF"); pulse = true; break;
                 case UiState.Starting:
                     title = "Запуск…"; subtitle = "Подождите секунду";
-                    color = Hex("#D9D9D9"); disc = Hex("#1C1C1C"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#1FFFFFFF"); pulse = true; break;
                 case UiState.Testing:
                     title = "Подбор стратегии"; subtitle = "Нажмите, чтобы отменить";
-                    color = Hex("#D9D9D9"); disc = Hex("#1C1C1C"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#1FFFFFFF"); pulse = true; break;
                 case UiState.Running:
                     title = "Работает"; subtitle = "Обход блокировок включён";
-                    color = Hex("#FFFFFF"); disc = Hex("#222222"); glow = 0.55; break;
+                    color = Hex("#FFFFFF"); disc = Hex("#33FFFFFF"); glow = 0.7; break;
                 default:
                     title = "Отключено"; subtitle = "Нажмите, чтобы включить";
-                    color = Hex("#6B6B6B"); disc = Hex("#161616"); break;
+                    color = Hex("#8A8A8A"); disc = Hex("#0FFFFFFF"); break;
             }
             if (sub != null) subtitle = sub;
 
@@ -434,17 +555,6 @@ namespace ZapretLauncher
 
         void Close_Click(object sender, RoutedEventArgs e) { Close(); }
 
-        void PowerButton_Enter(object sender, MouseEventArgs e) { ScaleHero(1.05); }
-
-        void PowerButton_Leave(object sender, MouseEventArgs e) { ScaleHero(1.0); }
-
-        void ScaleHero(double to)
-        {
-            var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(160)) { EasingFunction = new QuadraticEase() };
-            HeroScale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
-            HeroScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
-        }
-
         // The list scrolls by pixels; the wheel eases towards a target offset instead of jumping.
         static readonly DependencyProperty ListOffsetProperty = DependencyProperty.Register(
             "ListOffset", typeof(double), typeof(MainWindow), new PropertyMetadata(0.0, (d, e) =>
@@ -494,6 +604,29 @@ namespace ZapretLauncher
             {
                 string dir = Engine.FindRoot() ?? Paths.Root;
                 System.IO.Directory.CreateDirectory(dir);
+                Process.Start("explorer.exe", "\"" + dir + "\"");
+            }
+            catch (Exception ex) { Log(ex.Message); }
+        }
+
+        void UserList_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string dir = Engine.EnsureUserLists();
+                if (dir == null) { Log("Сначала установите компоненты zapret"); return; }
+                string file = (string)((FrameworkElement)sender).Tag;
+                Process.Start("notepad.exe", "\"" + System.IO.Path.Combine(dir, file) + "\"");
+            }
+            catch (Exception ex) { Log(ex.Message); }
+        }
+
+        void ListsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string dir = Engine.EnsureUserLists();
+                if (dir == null) { Log("Сначала установите компоненты zapret"); return; }
                 Process.Start("explorer.exe", "\"" + dir + "\"");
             }
             catch (Exception ex) { Log(ex.Message); }

@@ -168,6 +168,31 @@ namespace ZapretLauncher
                 .ToList();
         }
 
+        /// <summary>
+        /// Creates the user list files with the same placeholders service.bat writes
+        /// (winws treats an empty list as "match everything"). Returns the lists folder.
+        /// </summary>
+        public static string EnsureUserLists()
+        {
+            var root = FindRoot();
+            if (root == null) return null;
+            string lists = Path.Combine(root, "lists");
+            Directory.CreateDirectory(lists);
+
+            var defaults = new Dictionary<string, string>
+            {
+                { "list-general-user.txt", "# Never leave this file empty\r\ndomain.example.abc\r\n" },
+                { "list-exclude-user.txt", "domain.example.abc\r\n" },
+                { "ipset-exclude-user.txt", "203.0.113.113/32\r\n" },
+            };
+            foreach (var d in defaults)
+            {
+                string path = Path.Combine(lists, d.Key);
+                if (!File.Exists(path)) File.WriteAllText(path, d.Value, new UTF8Encoding(false));
+            }
+            return lists;
+        }
+
         static string Rep(string input, string key, string value)
         {
             return Regex.Replace(input, Regex.Escape(key), m => value, RegexOptions.IgnoreCase);
