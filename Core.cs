@@ -378,6 +378,10 @@ namespace ZapretLauncher
             if (!File.Exists(exe))
                 throw new FileNotFoundException("winws.exe не найден — возможно, его удалил антивирус");
 
+            // The strategies point winws at the *-user.txt lists, and winws refuses to start if one is
+            // missing. The original .bat files create them through service.bat; we have to do the same.
+            Engine.EnsureUserLists();
+
             string args = Engine.BuildArgs(s, gameFilter);
 
             // zapret needs TCP timestamps enabled (same step as the official service.bat).

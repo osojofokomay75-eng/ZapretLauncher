@@ -631,10 +631,16 @@ namespace ZapretLauncher
             AutoButton.IsEnabled = _strategies.Count > 0;
         }
 
-        static string FirstLine(string text, string fallback)
+        // winws prints a version banner first and the actual error last, so the reason is the last line.
+        static string Reason(string text, string fallback)
         {
             if (string.IsNullOrWhiteSpace(text)) return fallback;
-            return text.Split('\n')[0].Trim();
+            var lines = text.Split('\n').Select(l => l.Trim())
+                .Where(l => l.Length > 0 && !l.StartsWith("github version", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (lines.Length == 0) return fallback;
+            string last = lines[lines.Length - 1];
+            return last.Length > 200 ? last.Substring(0, 200) + "…" : last;
         }
 
         // ---------------------------------------------------------- actions
@@ -668,7 +674,7 @@ namespace ZapretLauncher
                 await Task.Run(() => _runner.Start(st, _s.GameFilter));
                 await Task.Delay(1500);
                 if (!_runner.IsRunning)
-                    throw new Exception(FirstLine(_runner.LastOutput, "winws.exe сразу завершился"));
+                    throw new Exception(Reason(_runner.LastOutput, "winws.exe сразу завершился"));
 
                 _runningName = st.Name;
                 SetState(UiState.Running, "Стратегия: " + st.Name);
@@ -693,7 +699,7 @@ namespace ZapretLauncher
         {
             if (_state != UiState.Running) return;
             SetState(UiState.Idle);
-            Log("winws.exe завершился: " + FirstLine(_runner.LastOutput, "неизвестная причина"));
+            Log("winws.exe завершился: " + Reason(_runner.LastOutput, "неизвестная причина"));
         }
 
         async void Strategy_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
