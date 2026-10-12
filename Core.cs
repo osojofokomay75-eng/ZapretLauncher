@@ -34,6 +34,7 @@ namespace ZapretLauncher
         public string Strategy = "general";
         public bool GameFilter;
         public bool Autostart;
+        public bool CloseToTray = true;
 
         public static Settings Load()
         {
@@ -51,6 +52,7 @@ namespace ZapretLauncher
                         case "strategy": s.Strategy = v; break;
                         case "gamefilter": s.GameFilter = v == "1"; break;
                         case "autostart": s.Autostart = v == "1"; break;
+                        case "closetotray": s.CloseToTray = v == "1"; break;
                     }
                 }
             }
@@ -68,6 +70,7 @@ namespace ZapretLauncher
                     "strategy=" + Strategy,
                     "gamefilter=" + (GameFilter ? "1" : "0"),
                     "autostart=" + (Autostart ? "1" : "0"),
+                    "closetotray=" + (CloseToTray ? "1" : "0"),
                 });
             }
             catch { }

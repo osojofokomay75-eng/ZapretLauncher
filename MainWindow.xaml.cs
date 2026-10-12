@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace ZapretLauncher
 {
@@ -23,6 +25,29 @@ namespace ZapretLauncher
 
         public static double GetRadius(DependencyObject o) { return (double)o.GetValue(RadiusProperty); }
         public static void SetRadius(DependencyObject o, double value) { o.SetValue(RadiusProperty, value); }
+    }
+
+    /// <summary>Text for the window's frosted hint, shown while the pointer rests on the element.</summary>
+    public static class Hint
+    {
+        public static readonly DependencyProperty TextProperty = DependencyProperty.RegisterAttached(
+            "Text", typeof(string), typeof(Hint), new PropertyMetadata(null, (d, e) =>
+            {
+                var fe = d as FrameworkElement;
+                if (fe == null || e.OldValue != null) return;
+                fe.MouseEnter += (s, a) => Owner(fe, w => w.QueueHint(fe));
+                fe.MouseLeave += (s, a) => Owner(fe, w => w.HideHint());
+                fe.PreviewMouseLeftButtonDown += (s, a) => Owner(fe, w => w.HideHint());
+            }));
+
+        public static string GetText(DependencyObject o) { return (string)o.GetValue(TextProperty); }
+        public static void SetText(DependencyObject o, string value) { o.SetValue(TextProperty, value); }
+
+        static void Owner(FrameworkElement fe, Action<MainWindow> act)
+        {
+            var w = Window.GetWindow(fe) as MainWindow;
+            if (w != null) act(w);
+        }
     }
 
     public partial class MainWindow : Window
@@ -51,7 +76,15 @@ namespace ZapretLauncher
             if (Width > work.Width) Width = work.Width - 20;
 
             BuildSky();
-            Loaded += (s, e) => { CollectGlass(Shell); UpdateFrost(); Drift(true); };
+            Loaded += (s, e) =>
+            {
+                var source = PresentationSource.FromVisual(this);
+                if (source != null && source.CompositionTarget != null) _dpiScale = source.CompositionTarget.TransformToDevice.M22;
+                CollectGlass(Shell);
+                UpdateFrost();
+                Drift(true);
+                SetupCursor();
+            };
             LayoutUpdated += (s, e) => UpdateFrost();
             IsVisibleChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
             StateChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
@@ -59,14 +92,211 @@ namespace ZapretLauncher
             SetupTray();
         }
 
+        [DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Windows 11: dark frame, rounded corners, a quiet border. Older systems ignore these.
+            try
+            {
+                var hwnd = new WindowInteropHelper(this).Handle;
+                int dark = 1, round = 2, border = 0x00303030;
+                DwmSetWindowAttribute(hwnd, 20, ref dark, sizeof(int));
+                DwmSetWindowAttribute(hwnd, 33, ref round, sizeof(int));
+                DwmSetWindowAttribute(hwnd, 34, ref border, sizeof(int));
+            }
+            catch { }
+        }
+
+        // ----------------------------------------------------------- cursor
+        // The dot is drawn by the window, not by Windows, so it can trail the pointer on a spring:
+        // it eases into place and swings wide on sharp turns. Clicks still land on the real pointer.
+        const double CursorSpeed = 34;      // spring frequency, rad/s: higher follows the mouse tighter
+        const double CursorDamping = 0.6;   // below 1 the dot overshoots; lower means more drift
+
+        Point _cursorPos, _cursorTarget;
+        Vector _cursorVel;
+        TimeSpan _cursorTime;
+        bool _cursorReady, _cursorShown, _cursorMoving, _cursorFresh, _pressed;
+        double _dpiScale = 1;
+
+        void SetupCursor()
+        {
+            Cursor = Cursors.None;
+            ForceCursor = true;
+            _cursorReady = true;
+        }
+
+        void ShowCursor(bool on)
+        {
+            if (on == _cursorShown) return;
+            _cursorShown = on;
+            CursorLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(on ? 1 : 0, TimeSpan.FromMilliseconds(120)));
+        }
+
+        void MoveCursorTo(Point p)
+        {
+            _cursorTarget = p;
+            if (!_cursorShown)
+            {
+                // entering the window: start on the pointer instead of flying in from the last spot
+                _cursorPos = p;
+                _cursorVel = new Vector();
+                CursorAt.X = p.X;
+                CursorAt.Y = p.Y;
+                ShowCursor(true);
+            }
+            if (_cursorMoving) return;
+            _cursorMoving = _cursorFresh = true;
+            CompositionTarget.Rendering += CursorTick;
+        }
+
+        // Damped spring towards the pointer, stepped once per rendered frame; stops itself when settled.
+        void CursorTick(object sender, EventArgs e)
+        {
+            var now = ((RenderingEventArgs)e).RenderingTime;
+            double dt = _cursorFresh ? 0 : Math.Min((now - _cursorTime).TotalSeconds, 0.05);
+            if (!_cursorFresh && dt <= 0) return;
+            _cursorFresh = false;
+            _cursorTime = now;
+
+            for (; dt > 0; dt -= 0.004)
+            {
+                double step = Math.Min(dt, 0.004);
+                var pull = (_cursorTarget - _cursorPos) * (CursorSpeed * CursorSpeed) - _cursorVel * (2 * CursorDamping * CursorSpeed);
+                _cursorVel += pull * step;
+                _cursorPos += _cursorVel * step;
+            }
+
+            if ((_cursorTarget - _cursorPos).Length < 0.1 && _cursorVel.Length < 3)
+            {
+                _cursorPos = _cursorTarget;
+                _cursorVel = new Vector();
+                _cursorMoving = false;
+                CompositionTarget.Rendering -= CursorTick;
+            }
+            CursorAt.X = _cursorPos.X;
+            CursorAt.Y = _cursorPos.Y;
+        }
+
+        void PressCursor(bool down)
+        {
+            if (down == _pressed) return;
+            _pressed = down;
+
+            var time = TimeSpan.FromMilliseconds(down ? 300 : 460);
+            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            var glow = new DoubleAnimation(down ? 0.55 : 1, time) { EasingFunction = ease };
+            CursorGlowScale.BeginAnimation(ScaleTransform.ScaleXProperty, glow);
+            CursorGlowScale.BeginAnimation(ScaleTransform.ScaleYProperty, glow);
+            CursorFill.BeginAnimation(SolidColorBrush.ColorProperty,
+                new ColorAnimation(Hex(down ? "#BDBDBD" : "#FFFFFF"), time) { EasingFunction = ease });
+        }
+
+        protected override void OnPreviewMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseLeftButtonDown(e);
+            PressCursor(true);
+        }
+
+        protected override void OnPreviewMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseLeftButtonUp(e);
+            PressCursor(false);
+        }
+
+        protected override void OnPreviewMouseMove(MouseEventArgs e)
+        {
+            base.OnPreviewMouseMove(e);
+            if (_cursorReady) MoveCursorTo(e.GetPosition(CursorLayer));
+            // the button may have been released outside the window
+            if (_pressed && e.LeftButton == MouseButtonState.Released) PressCursor(false);
+        }
+
+        protected override void OnMouseLeave(MouseEventArgs e)
+        {
+            base.OnMouseLeave(e);
+            ShowCursor(false);
+        }
+
+        // ------------------------------------------------------------- hint
+        DispatcherTimer _hintTimer;
+        FrameworkElement _hintFor;
+
+        internal void QueueHint(FrameworkElement target)
+        {
+            _hintFor = target;
+            if (_hintTimer == null)
+            {
+                _hintTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _hintTimer.Tick += (s, e) =>
+                {
+                    _hintTimer.Stop();
+                    if (_hintFor != null && _hintFor.IsMouseOver) ShowHint(_hintFor);
+                };
+            }
+            _hintTimer.Stop();
+            _hintTimer.Start();
+        }
+
+        internal void HideHint()
+        {
+            _hintFor = null;
+            if (_hintTimer != null) _hintTimer.Stop();
+            if (HintLayer.Visibility != Visibility.Visible) return;
+
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(100));
+            fade.Completed += (s, e) => { if (_hintFor == null) HintLayer.Visibility = Visibility.Collapsed; };
+            HintLayer.BeginAnimation(OpacityProperty, fade);
+        }
+
+        void ShowHint(FrameworkElement target)
+        {
+            HintText.Text = Hint.GetText(target);
+            HintBox.Margin = new Thickness();
+            HintLayer.Visibility = Visibility.Visible;
+            HintLayer.UpdateLayout();
+
+            // Centred on the element, but clear of the whole panel it sits in, so the hint never covers
+            // the neighbouring buttons; kept inside the window, and below the panel if there is no room above.
+            const double gap = 10, edge = 12;
+            FrameworkElement panel = target;
+            for (var p = VisualTreeHelper.GetParent(target); p != null && p != Shell; p = VisualTreeHelper.GetParent(p))
+            {
+                var border = p as System.Windows.Controls.Border;
+                if (border != null && !double.IsNaN(Glass.GetRadius(border))) { panel = border; break; }
+            }
+            var over = target.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, target.ActualWidth, target.ActualHeight));
+            var anchor = panel.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, panel.ActualWidth, panel.ActualHeight));
+            double w = HintBox.ActualWidth, h = HintBox.ActualHeight;
+            double x = Math.Round(Math.Max(edge, Math.Min(Shell.ActualWidth - w - edge, over.Left + over.Width / 2 - w / 2)));
+            double y = Math.Round(anchor.Top - gap - h);
+            if (y < edge) y = Math.Round(anchor.Bottom + gap);
+
+            HintBox.Margin = HintShadow.Margin = new Thickness(x, y, 0, 0);
+            HintShadow.Width = w;
+            HintShadow.Height = h;
+            HintFrost.Clip = new RectangleGeometry(new Rect(x, y, w, h), 14, 14);
+            HintLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(140)));
+        }
+
         // -------------------------------------------------------------- sky
-        const double SkyW = 1200, SkyH = 800;
+        const double SkyW = 1200, SkyH = 840;   // one star tile; taller than the window
         readonly List<Tuple<TranslateTransform, double>> _drift = new List<Tuple<TranslateTransform, double>>();
         readonly List<FrameworkElement> _glass = new List<FrameworkElement>();
         string _frostKey;
         bool _drifting;
 
-        // Three tiled star layers; the same brushes fill the sharp sky and its blurred copy, so they move as one.
+        // Three tiled star layers. Each is drawn twice from the same stars and moved by the same transform:
+        // sharp for the sky, and fat for the copy behind the glass, so the heavy blur leaves soft glows
+        // drifting under the panels instead of wiping the stars out.
+        const double FrostGrow = 10;
+        const double FrostGlow = 0.24;   // how bright those glows are
+        static readonly byte[] StarAlpha = { 90, 160, 255 };
+
         void BuildSky()
         {
             var rnd = new Random(7);
@@ -76,38 +306,71 @@ namespace ZapretLauncher
                 new { Count = 120, Min = 0.6, Max = 1.0, Seconds = 320.0 },
                 new { Count = 40, Min = 0.9, Max = 1.5, Seconds = 200.0 },
             };
-            byte[] alpha = { 90, 160, 255 };
 
             foreach (var l in layers)
             {
-                var tile = new DrawingGroup();
-                tile.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, SkyW, SkyH))));
-
-                var groups = alpha.Select(a => new GeometryGroup { FillRule = FillRule.Nonzero }).ToArray();
+                var stars = new List<Tuple<Point, double, int>>();
                 for (int i = 0; i < l.Count; i++)
                 {
-                    double r = l.Min + rnd.NextDouble() * (l.Max - l.Min);
-                    var at = new Point(rnd.NextDouble() * SkyW, rnd.NextDouble() * SkyH);
-                    groups[rnd.Next(groups.Length)].Children.Add(new EllipseGeometry(at, r, r));
+                    stars.Add(Tuple.Create(
+                        new Point(rnd.NextDouble() * SkyW, rnd.NextDouble() * SkyH),
+                        l.Min + rnd.NextDouble() * (l.Max - l.Min),
+                        rnd.Next(StarAlpha.Length)));
                 }
-                for (int k = 0; k < groups.Length; k++)
-                    tile.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(alpha[k], 255, 255, 255)), null, groups[k]));
-                tile.Freeze();
 
                 var move = new TranslateTransform();
-                var brush = new DrawingBrush(tile)
+                // The sharp layer is a cached bitmap two tiles wide that slides across the window. Sliding a
+                // bitmap costs nothing; re-drawing hundreds of stars on every step made each step drop a frame,
+                // which showed as smeared text whenever the list was scrolling.
+                Sky.Children.Add(new System.Windows.Shapes.Rectangle
                 {
-                    TileMode = TileMode.Tile,
-                    Viewport = new Rect(0, 0, SkyW, SkyH),
-                    ViewportUnits = BrushMappingMode.Absolute,
-                    Viewbox = new Rect(0, 0, SkyW, SkyH),
-                    ViewboxUnits = BrushMappingMode.Absolute,
-                    Transform = move
-                };
-                Sky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = brush });
-                FrostSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = brush });
+                    Width = SkyW * 2,
+                    Height = SkyH,
+                    Fill = StarBrush(stars, 1, 1, Transform.Identity),
+                    CacheMode = new BitmapCache(),
+                    RenderTransform = move
+                });
+                var glow = StarBrush(stars, FrostGrow, FrostGlow, move);
+                FrostSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
+                HintSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
                 _drift.Add(Tuple.Create(move, l.Seconds));
             }
+        }
+
+        static Brush StarBrush(List<Tuple<Point, double, int>> stars, double grow, double opacity, Transform move)
+        {
+            var groups = StarAlpha.Select(a => new GeometryGroup { FillRule = FillRule.Nonzero }).ToArray();
+            foreach (var s in stars)
+            {
+                double r = s.Item2 * grow;
+                // a star that crosses the tile edge is repeated on the other side, so the tiling has no seams
+                foreach (double dx in new[] { -SkyW, 0, SkyW })
+                {
+                    foreach (double dy in new[] { -SkyH, 0, SkyH })
+                    {
+                        var at = new Point(s.Item1.X + dx, s.Item1.Y + dy);
+                        if (at.X + r < 0 || at.X - r > SkyW || at.Y + r < 0 || at.Y - r > SkyH) continue;
+                        groups[s.Item3].Children.Add(new EllipseGeometry(at, r, r));
+                    }
+                }
+            }
+
+            var tile = new DrawingGroup();
+            tile.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, SkyW, SkyH))));
+            for (int k = 0; k < groups.Length; k++)
+                tile.Children.Add(new GeometryDrawing(new SolidColorBrush(Color.FromArgb(StarAlpha[k], 255, 255, 255)), null, groups[k]));
+            tile.Freeze();
+
+            return new DrawingBrush(tile)
+            {
+                TileMode = TileMode.Tile,
+                Viewport = new Rect(0, 0, SkyW, SkyH),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Viewbox = new Rect(0, 0, SkyW, SkyH),
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Opacity = opacity,
+                Transform = move
+            };
         }
 
         // The window lives in the tray most of the time, so the sky only moves while it is on screen.
@@ -138,7 +401,7 @@ namespace ZapretLauncher
             }
         }
 
-        // Cuts the blurred sky down to the shapes of the glass elements, and the shell to the rounded window.
+        // Cuts the blurred sky down to the shapes of the glass elements.
         void UpdateFrost()
         {
             if (_glass.Count == 0) return;
@@ -151,6 +414,16 @@ namespace ZapretLauncher
                 Rect r;
                 try { r = fe.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, fe.ActualWidth, fe.ActualHeight)); }
                 catch (InvalidOperationException) { continue; }
+
+                // glass sliding out of a clipped parent (the footer tray) is frosted only where it shows
+                for (var p = VisualTreeHelper.GetParent(fe); p != null && p != Shell; p = VisualTreeHelper.GetParent(p))
+                {
+                    var box = p as FrameworkElement;
+                    if (box != null && box.ClipToBounds)
+                        r.Intersect(box.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, box.ActualWidth, box.ActualHeight)));
+                }
+                if (r.IsEmpty || r.Width < 1 || r.Height < 1) continue;
+
                 double radius = Math.Min(Glass.GetRadius(fe), Math.Min(r.Width, r.Height) / 2);
                 shapes.Children.Add(new RectangleGeometry(r, radius, radius));
                 key.Append('|').Append(r).Append('/').Append(radius);
@@ -160,7 +433,6 @@ namespace ZapretLauncher
             _frostKey = key.ToString();
             shapes.Freeze();
             Frost.Clip = shapes;
-            Shell.Clip = new RectangleGeometry(new Rect(0, 0, Shell.ActualWidth, Shell.ActualHeight), 18, 18);
         }
 
         // ---------------------------------------------------------- startup
@@ -170,6 +442,7 @@ namespace ZapretLauncher
 
             GameToggle.IsChecked = _s.GameFilter;
             AutostartToggle.IsChecked = _s.Autostart;
+            CloseToggle.IsChecked = _s.CloseToTray;
             RefreshVersion();
 
             try
@@ -235,22 +508,22 @@ namespace ZapretLauncher
             {
                 case UiState.Missing:
                     title = "Нужна установка"; subtitle = "Нажмите, чтобы скачать компоненты zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#14FFFFFF"); glow = 0.3; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); glow = 0.3; break;
                 case UiState.Installing:
                     title = "Загрузка…"; subtitle = "Скачиваю и распаковываю zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#14FFFFFF"); pulse = true; break;
+                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); pulse = true; break;
                 case UiState.Starting:
                     title = "Запуск…"; subtitle = "Подождите секунду";
-                    color = Hex("#D9D9D9"); disc = Hex("#1FFFFFFF"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#59000000"); pulse = true; break;
                 case UiState.Testing:
                     title = "Подбор стратегии"; subtitle = "Нажмите, чтобы отменить";
-                    color = Hex("#D9D9D9"); disc = Hex("#1FFFFFFF"); pulse = true; break;
+                    color = Hex("#D9D9D9"); disc = Hex("#59000000"); pulse = true; break;
                 case UiState.Running:
                     title = "Работает"; subtitle = "Обход блокировок включён";
-                    color = Hex("#FFFFFF"); disc = Hex("#33FFFFFF"); glow = 0.7; break;
+                    color = Hex("#FFFFFF"); disc = Hex("#40000000"); glow = 0.7; break;
                 default:
                     title = "Отключено"; subtitle = "Нажмите, чтобы включить";
-                    color = Hex("#8A8A8A"); disc = Hex("#0FFFFFFF"); break;
+                    color = Hex("#8A8A8A"); disc = Hex("#73000000"); break;
             }
             if (sub != null) subtitle = sub;
 
@@ -301,7 +574,44 @@ namespace ZapretLauncher
             }
         }
 
-        void Log(string message) { LogText.Text = message; }
+        DispatcherTimer _logTimer;
+        bool _logShown, _trayOpen;
+
+        // The footer normally shows the version line alone. A message lifts that line, fades in under it
+        // and leaves again after a while.
+        void Log(string message)
+        {
+            bool show = !string.IsNullOrEmpty(message);
+            if (show) LogText.Text = message;
+
+            var time = TimeSpan.FromMilliseconds(280);
+            VersionShift.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(show ? -10 : 0, time) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            LogButton.BeginAnimation(OpacityProperty,
+                show ? new DoubleAnimation(_logShown ? 0.3 : 0, 1, time) : new DoubleAnimation(0, time));
+            LogButton.IsHitTestVisible = _logShown = show;
+
+            if (_logTimer == null)
+            {
+                _logTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+                _logTimer.Tick += (s, e) => Log(null);
+            }
+            _logTimer.Stop();
+            if (show) _logTimer.Start();
+        }
+
+        // Update / Folder live in a tray that slides out of the version line.
+        void Tray_Click(object sender, RoutedEventArgs e)
+        {
+            _trayOpen = !_trayOpen;
+            var time = TimeSpan.FromMilliseconds(_trayOpen ? 320 : 220);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+            TrayClip.BeginAnimation(WidthProperty, new DoubleAnimation(_trayOpen ? Tray.ActualWidth : 0, time) { EasingFunction = ease });
+            Tray.BeginAnimation(System.Windows.Controls.Canvas.LeftProperty, new DoubleAnimation(_trayOpen ? 0 : -18, time) { EasingFunction = ease });
+            Tray.BeginAnimation(OpacityProperty, new DoubleAnimation(_trayOpen ? 1 : 0, time));
+            TrayArrow.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(_trayOpen ? 180 : 0, time) { EasingFunction = ease });
+        }
 
         void RefreshVersion()
         {
@@ -428,6 +738,12 @@ namespace ZapretLauncher
             }
         }
 
+        void CloseToTray_Click(object sender, RoutedEventArgs e)
+        {
+            _s.CloseToTray = CloseToggle.IsChecked == true;
+            _s.Save();
+        }
+
         async void Auto_Click(object sender, RoutedEventArgs e)
         {
             if (_strategies.Count == 0) return;
@@ -548,7 +864,9 @@ namespace ZapretLauncher
         // -------------------------------------------------------- chrome
         void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left) DragMove();
+            if (e.ChangedButton != MouseButton.Left) return;
+            DragMove();
+            PressCursor(false);   // the move loop swallows the button-up
         }
 
         void Min_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
@@ -560,8 +878,11 @@ namespace ZapretLauncher
             "ListOffset", typeof(double), typeof(MainWindow), new PropertyMetadata(0.0, (d, e) =>
             {
                 var w = (MainWindow)d;
-                if (w._listScroll != null) w._listScroll.ScrollToVerticalOffset((double)e.NewValue);
+                if (w._listScroll != null) w._listScroll.ScrollToVerticalOffset(w.SnapToPixel((double)e.NewValue));
             }));
+
+        // Text drawn between device pixels is what smeared while the list was moving.
+        double SnapToPixel(double v) { return Math.Round(v * _dpiScale) / _dpiScale; }
 
         System.Windows.Controls.ScrollViewer _listScroll;
         double _scrollTarget;
@@ -586,7 +907,7 @@ namespace ZapretLauncher
 
             // Start from where the list really is unless a wheel animation is still in flight.
             if (!_scrolling) _scrollTarget = _listScroll.VerticalOffset;
-            _scrollTarget = Math.Max(0, Math.Min(_listScroll.ScrollableHeight, _scrollTarget - e.Delta * 0.8));
+            _scrollTarget = SnapToPixel(Math.Max(0, Math.Min(_listScroll.ScrollableHeight, _scrollTarget - e.Delta * 0.8)));
 
             var a = new DoubleAnimation(_listScroll.VerticalOffset, _scrollTarget, TimeSpan.FromMilliseconds(260))
             {
@@ -635,8 +956,8 @@ namespace ZapretLauncher
         // -------------------------------------------------------- closing
         protected override void OnClosing(CancelEventArgs e)
         {
-            // While the bypass is running, the close button just hides the window to the tray.
-            if (!_exiting && _state == UiState.Running)
+            // With "close to tray" on, the close button only hides the window; Exit in the tray menu quits.
+            if (!_exiting && _s.CloseToTray)
             {
                 e.Cancel = true;
                 Hide();
