@@ -11,8 +11,8 @@ using Microsoft.Win32;
 namespace ZapretLauncher
 {
     /// <summary>
-    /// The installer is the launcher itself under another name: started as *Setup.exe (or with --setup)
-    /// it shows the setup wizard, and with --uninstall the removal wizard, both inside the main window.
+    /// The installer is the launcher itself: any copy that is not the installed one shows the setup wizard
+    /// (--portable skips it), and --uninstall shows the removal wizard, both inside the main window.
     /// </summary>
     public enum SetupMode { None, Install, Uninstall }
 
@@ -66,6 +66,22 @@ namespace ZapretLauncher
                 }
             }
             catch { return null; }
+        }
+
+        /// <summary>True when this exe is the copy the installer registered, not a stray download.</summary>
+        public static bool IsInstalledCopy
+        {
+            get
+            {
+                string dir = ExistingDir();
+                if (dir == null) return false;
+                try
+                {
+                    return string.Equals(Path.GetFullPath(Path.Combine(dir, ExeName)), Path.GetFullPath(SelfPath),
+                        StringComparison.OrdinalIgnoreCase);
+                }
+                catch { return false; }
+            }
         }
 
         /// <summary>Closes other launcher instances and winws, so their files can be replaced or removed.</summary>
