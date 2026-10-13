@@ -1138,6 +1138,8 @@
              ModalFrost to the open panel. A click beside the panel, or Esc, closes it. -->
         <Grid x:Name="ModalLayer" Margin="0,44,0,0" Visibility="Collapsed" Opacity="0">
             <Rectangle Fill="#8C000000" MouseLeftButtonDown="ModalShade_Down" />
+            <!-- the title bar is shaded with the rest, so it does not stand out as a frame, but stays in use -->
+            <Rectangle Fill="#8C000000" Height="44" VerticalAlignment="Top" Margin="0,-44,0,0" IsHitTestVisible="False" />
             <Border x:Name="ModalShadow" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="16" Background="#000000"
                     IsHitTestVisible="False">
                 <Border.Effect>
