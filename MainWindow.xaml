@@ -15,13 +15,16 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- Palette: black sky, white for "on"; panels are frosted glass (see Frost below) -->
+        <!-- Palette: black sky, panels of frosted glass (see Frost below). Signal is the accent - white unless
+             Settings say otherwise - so it is always referenced dynamically; SignalSoft is its quieter shade. -->
         <SolidColorBrush x:Key="Ink" Color="#0A0A0A" />
         <SolidColorBrush x:Key="Line" Color="#222222" />
         <SolidColorBrush x:Key="Text" Color="#F2F2F2" />
         <SolidColorBrush x:Key="Muted" Color="#9A9A9A" />
         <SolidColorBrush x:Key="Faint" Color="#6B6B6B" />
         <SolidColorBrush x:Key="Signal" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SignalSoft" Color="#A3A3A3" />
+        <Color x:Key="SignalColor">#FFFFFF</Color>
         <SolidColorBrush x:Key="Edge" Color="#24FFFFFF" />
 
         <!-- Backdrop; also painted under the glass, so panels read as see-through rather than filled -->
@@ -30,8 +33,7 @@
             <GradientStop Color="#030303" Offset="1" />
         </RadialGradientBrush>
 
-        <!-- Shared by every piece of frosted glass -->
-        <BlurEffect x:Key="FrostBlur" Radius="72" RenderingBias="Performance" />
+        <!-- Laid over every piece of frosted glass; the blur itself is made in code, its strength is a setting -->
         <SolidColorBrush x:Key="Veil" Color="#12FFFFFF" />
 
         <!-- Frosted panel: the blur itself is drawn by the Frost layer behind it -->
@@ -152,11 +154,11 @@
                         <Grid Background="Transparent">
                             <ContentPresenter Margin="12,9,12,12" HorizontalAlignment="Center" />
                             <Border x:Name="Bar" Width="18" Height="3" CornerRadius="2" VerticalAlignment="Bottom"
-                                    Margin="0,0,0,4" Background="{StaticResource Signal}" Visibility="Hidden" />
-                            <Ellipse x:Name="Dot" Width="8" Height="8" Fill="#FFFFFF" Opacity="0" IsHitTestVisible="False"
+                                    Margin="0,0,0,4" Background="{DynamicResource Signal}" Visibility="Hidden" />
+                            <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{DynamicResource Signal}" Opacity="0" IsHitTestVisible="False"
                                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4,2">
                                 <Ellipse.Effect>
-                                    <DropShadowEffect Color="#FFFFFF" BlurRadius="12" ShadowDepth="0" Opacity="0.75" />
+                                    <DropShadowEffect Color="{DynamicResource SignalColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.75" />
                                 </Ellipse.Effect>
                             </Ellipse>
                         </Grid>
@@ -167,6 +169,80 @@
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Slider (Settings): a thin line, filled with the accent up to the thumb -->
+        <Style x:Key="SlideSide" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent" Height="20">
+                            <Border Height="3" CornerRadius="1.5" Background="{TemplateBinding Background}" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SlideThumb" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Grid Width="16" Height="20" Background="Transparent">
+                            <Ellipse Width="14" Height="14" Fill="{DynamicResource Signal}" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Slide" TargetType="Slider">
+            <Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SlideSide}" Background="{DynamicResource Signal}" Command="Slider.DecreaseLarge" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SlideSide}" Background="#24FFFFFF" Command="Slider.IncreaseLarge" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource SlideThumb}" />
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Accent colour to choose (Settings): the dot is the colour, the ring marks the chosen one -->
+        <Style x:Key="Swatch" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="GroupName" Value="Accent" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Width="26" Height="26" Background="Transparent">
+                            <Ellipse x:Name="Ring" Stroke="{TemplateBinding Background}" StrokeThickness="1.5" Opacity="0" />
+                            <Ellipse Width="16" Height="16" Fill="{TemplateBinding Background}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Ring" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Ring" Property="Opacity" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -261,7 +337,7 @@
                         <Border x:Name="Bd" CornerRadius="8" Padding="18,9,18,9" Margin="6,1,6,1" Background="Transparent">
                             <Grid>
                                 <Border x:Name="Bar" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left"
-                                        Margin="-16,0,0,0" Background="{StaticResource Signal}" Visibility="Hidden" />
+                                        Margin="-16,0,0,0" Background="{DynamicResource Signal}" Visibility="Hidden" />
                                 <ContentPresenter HorizontalAlignment="Center" TextElement.FontSize="13.5" />
                                 <TextBlock x:Name="Tick" Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                            Foreground="{StaticResource Text}" HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -345,7 +421,7 @@
                                         </CombinedGeometry>
                                     </Path.Data>
                                 </Path>
-                                <Path x:Name="TrackOn" Fill="#A3A3A3" Visibility="Collapsed">
+                                <Path x:Name="TrackOn" Fill="{DynamicResource SignalSoft}" Visibility="Collapsed">
                                     <Path.Data>
                                         <CombinedGeometry GeometryCombineMode="Exclude">
                                             <CombinedGeometry.Geometry1>
@@ -407,19 +483,29 @@
     <Grid x:Name="Shell">
         <Rectangle Fill="{StaticResource Space}" />
 
+        <!-- The user's own picture, if one is chosen in Settings: it fills the window, dimmed so the text stays readable -->
+        <Grid x:Name="Wallpaper" Visibility="Collapsed" IsHitTestVisible="False">
+            <Rectangle x:Name="WallpaperBox" />
+            <Rectangle Fill="#85000000" />
+        </Grid>
+
         <!-- Drifting stars; the layers are filled in code -->
         <Canvas x:Name="Sky" IsHitTestVisible="False" ClipToBounds="True" />
 
-        <!-- Frosted glass: the backdrop again, a heavily blurred copy of the sky and a light veil,
-             clipped in code to every element with Glass.Radius -->
+        <!-- Frosted glass: the backdrop again, a blurred copy of the sky (or of the picture) and a light veil,
+             clipped in code to every element with Glass.Radius. The blurred copies are drawn at reduced
+             resolution - a heavy blur hides the upscaling and costs a fraction; code sets the scale. -->
         <Grid x:Name="Frost" IsHitTestVisible="False">
             <Rectangle Fill="{StaticResource Space}" />
-            <!-- Blurred at quarter resolution: a blur this heavy hides the upscaling and costs a fraction -->
-            <Grid>
-                <Grid.CacheMode>
-                    <BitmapCache RenderAtScale="0.25" />
-                </Grid.CacheMode>
-                <Grid x:Name="FrostSky" Effect="{StaticResource FrostBlur}" />
+            <Grid x:Name="FrostSkyHost">
+                <Grid x:Name="FrostSky" />
+            </Grid>
+            <Grid x:Name="FrostWallpaper" Visibility="Collapsed">
+                <!-- wider than the window and tiled as mirror images, so the blur has picture to take in at the edges -->
+                <Grid x:Name="FrostWallpaperHost" Margin="-130">
+                    <Rectangle x:Name="FrostWallpaperBox" />
+                </Grid>
+                <Rectangle Fill="#A6000000" />
             </Grid>
             <Rectangle Fill="{StaticResource Veil}" />
         </Grid>
@@ -441,6 +527,7 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <RadioButton x:Name="TabZapret" Content="Zapret" Style="{StaticResource Tab}" IsChecked="True" Checked="Tab_Checked" />
                     <RadioButton x:Name="TabProxy" Content="TG WS Proxy" Style="{StaticResource Tab}" Checked="Tab_Checked" />
+                    <RadioButton x:Name="TabSettings" Content="Настройки" Style="{StaticResource Tab}" Checked="Tab_Checked" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                     <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click" />
@@ -448,30 +535,54 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Zapret tab -->
+            <!-- Zapret tab: the power button and the strategies; everything to tune is on the Settings tab -->
             <Grid x:Name="ZapretView" Grid.Row="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Power disc and status -->
                 <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <Grid Width="150" Height="150">
-                        <Ellipse x:Name="Disc" Width="124" Height="124">
-                            <Ellipse.Fill>
-                                <SolidColorBrush Color="#73000000" />
-                            </Ellipse.Fill>
-                        </Ellipse>
-                        <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="3">
+                        <!-- An eclipse: a black disc with a corona of the accent colour behind it. The corona is two
+                             blurred discs, a tight bright one and a wide faint one; each is drawn once into a
+                             bitmap, and code only fades and swells those (see Tint). -->
+                        <Canvas IsHitTestVisible="False">
+                            <Grid x:Name="HaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Grid.CacheMode>
+                                    <BitmapCache RenderAtScale="0.5" />
+                                </Grid.CacheMode>
+                                <Grid.RenderTransform>
+                                    <ScaleTransform />
+                                </Grid.RenderTransform>
+                                <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="80" RenderingBias="Performance" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Grid>
+                            <Grid x:Name="HaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Grid.CacheMode>
+                                    <BitmapCache RenderAtScale="0.5" />
+                                </Grid.CacheMode>
+                                <Grid.RenderTransform>
+                                    <ScaleTransform />
+                                </Grid.RenderTransform>
+                                <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="36" RenderingBias="Performance" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Grid>
+                        </Canvas>
+                        <Ellipse x:Name="Disc" Width="124" Height="124" Fill="#000000" />
+                        <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="1">
                             <Ellipse.Stroke>
-                                <SolidColorBrush Color="#6B6B6B" />
+                                <SolidColorBrush Color="#33FFFFFF" />
                             </Ellipse.Stroke>
-                            <Ellipse.Effect>
-                                <DropShadowEffect x:Name="GlowFx" Color="#6B6B6B" BlurRadius="40" ShadowDepth="0" Opacity="0" />
-                            </Ellipse.Effect>
                         </Ellipse>
                         <Viewbox Width="46" Height="46" IsHitTestVisible="False">
                             <Canvas Width="24" Height="24">
@@ -494,8 +605,8 @@
                                HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
                 </StackPanel>
 
-                <!-- Strategy list, centred between the power button and the options -->
-                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,14">
+                <!-- Strategy list -->
+                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,8">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -521,103 +632,54 @@
                                  SelectionChanged="Strategy_Changed" />
                     </Grid>
                 </Border>
-
-                <!-- Options -->
-                <Grid Grid.Row="2" Height="94" Margin="24,0,24,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="GameToggle" Style="{StaticResource Switch}" Click="Game_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Игровой фильтр" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Обход для игровых портов 1024–65535" FontSize="12"
-                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </CheckBox>
-                    </Border>
-
-                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="CloseToggle" Style="{StaticResource Switch}" Click="CloseToTray_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Сворачивать в трей" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Закрытие окна не завершает программу" FontSize="12"
-                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </CheckBox>
-                    </Border>
-
-                    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="AutostartToggle" Style="{StaticResource Switch}" Click="Autostart_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
-                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </CheckBox>
-                    </Border>
-                </Grid>
-
-                <!-- User lists -->
-                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="24,0,24,8" Padding="16,9,12,9">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
-                            <TextBlock Text="Свои списки" FontSize="14" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
-                                       Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <UniformGrid Grid.Column="1" Rows="1">
-                            <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}"
-                                    Margin="4" Click="UserList_Click"
-                                    local:Hint.Text="list-general-user.txt — сайты, которые нужно разблокировать дополнительно.&#x0a;&#x0a;Кому нужно: если сайт заблокирован и не открывается даже с включённым обходом.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com — без https:// и без пути. Поддомены подхватятся сами. Не оставляйте файл пустым.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                            <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}"
-                                    Margin="4" Click="UserList_Click"
-                                    local:Hint.Text="list-exclude-user.txt — сайты, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: если с включённым обходом перестал работать обычный сайт или сервис — банк, игра, рабочий портал.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                            <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}"
-                                    Margin="4" Click="UserList_Click"
-                                    local:Hint.Text="ipset-exclude-user.txt — IP-адреса и подсети, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: опытным пользователям — когда ломается то, у чего нет доменного имени: игровой сервер, VPN, устройство в домашней сети.&#x0a;&#x0a;Что делать: впишите адреса по одному в строке, например 192.168.0.0/16 или 203.0.113.5.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                            <Button Content="Папка lists" Style="{StaticResource Pill}"
-                                    Margin="4" Click="ListsFolder_Click"
-                                    local:Hint.Text="Открывает папку со всеми списками zapret.&#x0a;&#x0a;Кому нужно: тем, кто хочет посмотреть, какие сайты и адреса уже входят в обход, или подложить готовый список.&#x0a;&#x0a;Важно: основные файлы (list-general.txt, ipset-all.txt и другие) перезаписываются при обновлении компонентов. Свои правки вносите только в файлы с user в названии — они сохраняются." />
-                        </UniformGrid>
-                    </Grid>
-                </Border>
             </Grid>
 
-            <!-- TG WS Proxy tab: the same places as on the zapret tab - power button, a card in the middle,
-                 three switches and a bar of buttons (ProxyTab.cs). Nothing here has to be filled in: address,
-                 port and key are the proxy's own defaults and live in its config.json. -->
+            <!-- TG WS Proxy tab: laid out like the zapret tab - power button, a card under it (ProxyTab.cs).
+                 Nothing has to be filled in: address, port and key are the proxy's own defaults and live in its
+                 config.json; its switches are on the Settings tab. -->
             <Grid x:Name="ProxyView" Grid.Row="1" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <Grid Width="150" Height="150">
-                        <Ellipse x:Name="PxDisc" Width="124" Height="124">
-                            <Ellipse.Fill>
-                                <SolidColorBrush Color="#73000000" />
-                            </Ellipse.Fill>
-                        </Ellipse>
-                        <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="3">
+                        <Canvas IsHitTestVisible="False">
+                            <Grid x:Name="PxHaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Grid.CacheMode>
+                                    <BitmapCache RenderAtScale="0.5" />
+                                </Grid.CacheMode>
+                                <Grid.RenderTransform>
+                                    <ScaleTransform />
+                                </Grid.RenderTransform>
+                                <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="80" RenderingBias="Performance" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Grid>
+                            <Grid x:Name="PxHaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Grid.CacheMode>
+                                    <BitmapCache RenderAtScale="0.5" />
+                                </Grid.CacheMode>
+                                <Grid.RenderTransform>
+                                    <ScaleTransform />
+                                </Grid.RenderTransform>
+                                <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
+                                    <Ellipse.Effect>
+                                        <BlurEffect Radius="36" RenderingBias="Performance" />
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Grid>
+                        </Canvas>
+                        <Ellipse x:Name="PxDisc" Width="124" Height="124" Fill="#000000" />
+                        <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="1">
                             <Ellipse.Stroke>
-                                <SolidColorBrush Color="#6B6B6B" />
+                                <SolidColorBrush Color="#33FFFFFF" />
                             </Ellipse.Stroke>
-                            <Ellipse.Effect>
-                                <DropShadowEffect x:Name="PxGlowFx" Color="#6B6B6B" BlurRadius="40" ShadowDepth="0" Opacity="0" />
-                            </Ellipse.Effect>
                         </Ellipse>
                         <Viewbox Width="46" Height="46" IsHitTestVisible="False">
                             <Canvas Width="24" Height="24">
@@ -641,7 +703,8 @@
                 </StackPanel>
 
                 <!-- What happens after the button is pressed, where the strategy list is on the other tab -->
-                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,14">
+                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" VerticalAlignment="Top"
+                        Margin="0,0,0,8">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -649,6 +712,9 @@
                         </Grid.RowDefinitions>
 
                         <Grid Margin="12,10,12,8">
+                            <Button Content="Ссылка" Style="{StaticResource Pill}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center" Click="PxCopy_Click"
+                                    local:Hint.Text="Копирует ссылку вида tg://proxy… с адресом, портом и ключом этого прокси.&#x0a;&#x0a;Кому нужно: если кнопка «Подключить» не открыла Telegram.&#x0a;&#x0a;Что делать: отправьте ссылку себе в «Избранное» в Telegram и нажмите на неё." />
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock Text="Подключение Telegram" FontSize="14" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
@@ -660,7 +726,7 @@
                                     local:Hint.Text="Открывает в Telegram на этом компьютере окно с предложением подключить прокси — останется подтвердить.&#x0a;&#x0a;Кому нужно: при первом включении прокси это происходит само. Кнопка — на случай, если окно закрыли или прокси пропал из настроек Telegram.&#x0a;&#x0a;Если Telegram после этого не соединяется, отключите в его настройках прокси «Попытку соединения по IPv6»." />
                         </Grid>
 
-                        <StackPanel Grid.Row="1" Margin="34,0,34,10" VerticalAlignment="Center">
+                        <StackPanel Grid.Row="1" Margin="34,6,34,16">
                             <Grid Margin="0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="46" />
@@ -689,7 +755,7 @@
                                 </Border>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="Подтвердите в Telegram" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="Telegram сам откроется с предложением подключить прокси. Не открылся — нажмите «Подключить»" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                    <TextBlock Text="Telegram сам откроется с предложением подключить прокси. Не открылся — нажмите «Подключить» или возьмите ссылку" FontSize="12" LineHeight="17" TextWrapping="Wrap"
                                                Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                                 </StackPanel>
                             </Grid>
@@ -712,82 +778,174 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+            </Grid>
 
-                <!-- Switches -->
-                <Grid Grid.Row="2" Height="94" Margin="24,0,24,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+            <!-- Settings tab: everything there is to tune - the bypass, the proxy, the program itself and its looks
+                 (SettingsTab.cs). The switches are the same controls the other tabs used to carry. -->
+            <Grid x:Name="SettingsView" Grid.Row="1" Visibility="Collapsed" Margin="24,6,24,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="PxCf" Style="{StaticResource Switch}" Click="PxSwitch_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Резерв через Cloudflare" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Если прямой путь к Telegram закрыт" FontSize="12"
+                <StackPanel Grid.Column="0">
+                    <Border Style="{StaticResource Card}" Padding="20,14,20,12" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="Zapret" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,0,0,3" />
+                            <CheckBox x:Name="GameToggle" Style="{StaticResource Switch}" Click="Game_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Игровой фильтр" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Обход для игровых портов 1024–65535" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <StackPanel Margin="0,9,0,6">
+                                <TextBlock Text="Свои списки" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
                                            Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                             </StackPanel>
-                        </CheckBox>
-                    </Border>
-
-                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="PxH2" Style="{StaticResource Switch}" Click="PxSwitch_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Ускорение медиа" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Фото и видео по HTTP/2 через Cloudflare" FontSize="12"
-                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </CheckBox>
-                    </Border>
-
-                    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,0">
-                        <CheckBox x:Name="PxAuto" Style="{StaticResource Switch}" Click="PxAuto_Click" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="Включать с лаунчером" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Прокси стартует сам при запуске" FontSize="12"
-                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                        </CheckBox>
-                    </Border>
-                </Grid>
-
-                <!-- Actions -->
-                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="24,0,24,8" Padding="16,9,12,9">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
-                            <TextBlock Text="Действия" FontSize="14" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
-                                       Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            <UniformGrid Rows="1" Margin="-4,0">
+                                <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}"
+                                        Margin="4" Click="UserList_Click"
+                                        local:Hint.Text="list-general-user.txt — сайты, которые нужно разблокировать дополнительно.&#x0a;&#x0a;Кому нужно: если сайт заблокирован и не открывается даже с включённым обходом.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com — без https:// и без пути. Поддомены подхватятся сами. Не оставляйте файл пустым.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                                <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}"
+                                        Margin="4" Click="UserList_Click"
+                                        local:Hint.Text="list-exclude-user.txt — сайты, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: если с включённым обходом перестал работать обычный сайт или сервис — банк, игра, рабочий портал.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                                <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}"
+                                        Margin="4" Click="UserList_Click"
+                                        local:Hint.Text="ipset-exclude-user.txt — IP-адреса и подсети, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: опытным пользователям — когда ломается то, у чего нет доменного имени: игровой сервер, VPN, устройство в домашней сети.&#x0a;&#x0a;Что делать: впишите адреса по одному в строке, например 192.168.0.0/16 или 203.0.113.5.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                                <Button Content="Папка lists" Style="{StaticResource Pill}"
+                                        Margin="4" Click="ListsFolder_Click"
+                                        local:Hint.Text="Открывает папку со всеми списками zapret.&#x0a;&#x0a;Кому нужно: тем, кто хочет посмотреть, какие сайты и адреса уже входят в обход, или подложить готовый список.&#x0a;&#x0a;Важно: основные файлы (list-general.txt, ipset-all.txt и другие) перезаписываются при обновлении компонентов. Свои правки вносите только в файлы с user в названии — они сохраняются." />
+                            </UniformGrid>
                         </StackPanel>
-                        <UniformGrid Grid.Column="1" Rows="1">
-                            <Button Content="Скопировать ссылку" Style="{StaticResource Pill}"
-                                    Margin="4" Click="PxCopy_Click"
-                                    local:Hint.Text="Копирует ссылку вида tg://proxy… с адресом, портом и ключом этого прокси.&#x0a;&#x0a;Кому нужно: если кнопка «Подключить» не открыла Telegram.&#x0a;&#x0a;Что делать: отправьте ссылку себе в «Избранное» в Telegram и нажмите на неё." />
-                            <Button x:Name="PxMedia" Content="Не грузятся медиа" Style="{StaticResource Pill}"
-                                    Margin="4" Click="PxMedia_Click"
-                                    local:Hint.Text="Переключает способ, которым прокси соединяется с серверами Telegram (таблицу DC → IP), и перезапускает его.&#x0a;&#x0a;Кому нужно: если сообщения через прокси ходят, а фото и видео не загружаются.&#x0a;&#x0a;Способов три, каждое нажатие включает следующий по кругу. Нажали — проверьте Telegram; не помогло — нажмите ещё раз." />
-                            <Button Content="Логи" Style="{StaticResource Pill}"
-                                    Margin="4" Click="PxLogs_Click"
-                                    local:Hint.Text="Открывает журнал прокси в Блокноте.&#x0a;&#x0a;Кому нужно: если Telegram не соединяется — причина обычно написана в последних строках. Журнал начинается заново при каждом запуске прокси." />
-                            <Button Content="Папка" Style="{StaticResource Pill}"
-                                    Margin="4" Click="PxFolder_Click"
-                                    local:Hint.Text="Открывает папку, где лежат TG WS Proxy и его настройки.&#x0a;&#x0a;Кому нужно: тем, кто хочет поправить файл TgWsProxy_data\config.json вручную — в нём адрес, порт, ключ и остальные настройки прокси, которых нет на этой вкладке." />
-                        </UniformGrid>
-                    </Grid>
-                </Border>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="20,14,20,12">
+                        <StackPanel>
+                            <TextBlock Text="Прокси Telegram" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,0,0,3" />
+                            <CheckBox x:Name="PxCf" Style="{StaticResource Switch}" Click="PxSwitch_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Резерв через Cloudflare" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Если прямой путь к Telegram закрыт" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="PxH2" Style="{StaticResource Switch}" Click="PxSwitch_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Ускорение медиа" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Фото и видео по HTTP/2 через Cloudflare" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="PxAuto" Style="{StaticResource Switch}" Click="PxAuto_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Включать с лаунчером" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Прокси стартует сам при запуске" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <UniformGrid Rows="1" Margin="-4,5,-4,0">
+                                <Button x:Name="PxMedia" Content="Не грузятся медиа" Style="{StaticResource Pill}"
+                                        Margin="4" Click="PxMedia_Click"
+                                        local:Hint.Text="Переключает способ, которым прокси соединяется с серверами Telegram (таблицу DC → IP), и перезапускает его.&#x0a;&#x0a;Кому нужно: если сообщения через прокси ходят, а фото и видео не загружаются.&#x0a;&#x0a;Способов три, каждое нажатие включает следующий по кругу. Нажали — проверьте Telegram; не помогло — нажмите ещё раз." />
+                                <Button Content="Логи" Style="{StaticResource Pill}"
+                                        Margin="4" Click="PxLogs_Click"
+                                        local:Hint.Text="Открывает журнал прокси в Блокноте.&#x0a;&#x0a;Кому нужно: если Telegram не соединяется — причина обычно написана в последних строках. Журнал начинается заново при каждом запуске прокси." />
+                                <Button Content="Папка" Style="{StaticResource Pill}"
+                                        Margin="4" Click="PxFolder_Click"
+                                        local:Hint.Text="Открывает папку, где лежат TG WS Proxy и его настройки.&#x0a;&#x0a;Кому нужно: тем, кто хочет поправить файл TgWsProxy_data\config.json вручную — в нём адрес, порт, ключ и остальные настройки прокси, которых нет на этой вкладке." />
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <Border Style="{StaticResource Card}" Padding="20,14,20,8" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="Приложение" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,0,0,3" />
+                            <CheckBox x:Name="CloseToggle" Style="{StaticResource Switch}" Click="CloseToTray_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Сворачивать в трей" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Закрытие окна не завершает программу" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <CheckBox x:Name="AutostartToggle" Style="{StaticResource Switch}" Click="Autostart_Click" Margin="0,9">
+                                <StackPanel>
+                                    <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="20,14,20,14">
+                        <StackPanel>
+                            <TextBlock Text="Оформление" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,0,0,3" />
+                            <Grid Margin="0,9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Фон" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock x:Name="BgName" Text="Звёзды" FontSize="12" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Выбрать картинку" Style="{StaticResource Pill}" Click="BgPick_Click"
+                                            local:Hint.Text="Ставит фоном окна вашу картинку: она растягивается на всё окно, лишнее по краям обрезается.&#x0a;&#x0a;Подходят JPG, PNG, BMP, GIF и TIFF. Лаунчер хранит свою копию картинки, исходный файл можно потом удалить или переместить." />
+                                    <Button x:Name="BgReset" Content="Вернуть звёзды" Style="{StaticResource Pill}" Margin="8,0,0,0"
+                                            Click="BgReset_Click" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Размытие стекла" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Насколько панели размывают фон под собой" FontSize="12" TextTrimming="CharacterEllipsis"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="BlurSlider" Style="{StaticResource Slide}" Width="170" Minimum="0" Maximum="100"
+                                            LargeChange="10" SmallChange="1" Value="60" ValueChanged="Blur_Changed" />
+                                    <TextBlock x:Name="BlurValue" Text="60%" Width="40" TextAlignment="Right" FontSize="12.5"
+                                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Margin="0,9,0,0">
+                                <TextBlock Text="Акцентный цвет" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Кнопка включения, индикаторы, переключатели, выделение в списках" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <StackPanel x:Name="AccentSwatches" Orientation="Horizontal" Margin="-5,10,0,0">
+                                <RadioButton Style="{StaticResource Swatch}" Background="#FFFFFF" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#7AB8FF" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#5EEAD4" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#86EFAC" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#FDE047" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#FDBA74" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#FB7185" Checked="Accent_Checked" />
+                                <RadioButton Style="{StaticResource Swatch}" Background="#C4B5FD" Checked="Accent_Checked" />
+                                <TextBox x:Name="AccentHex" Style="{StaticResource Field}" Width="92" Margin="10,0,0,0" MaxLength="7"
+                                         VerticalAlignment="Center" LostFocus="AccentHex_LostFocus" KeyDown="AccentHex_KeyDown"
+                                         local:Hint.Text="Свой цвет: шесть шестнадцатеричных цифр, например #7AB8FF, и Enter.&#x0a;&#x0a;Интерфейс тёмный, поэтому светлые и яркие цвета видны лучше тёмных." />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
 
             <!-- Footer: the version line pulls out a tray of actions; messages fade in under it (see Log) -->
             <StackPanel Grid.Row="2" Margin="24,0,24,8">
                 <ProgressBar x:Name="DownloadBar" Height="3" Visibility="Collapsed" Minimum="0" Maximum="100"
-                             Background="#24FFFFFF" Foreground="{StaticResource Signal}" BorderThickness="0"
+                             Background="#24FFFFFF" Foreground="{DynamicResource Signal}" BorderThickness="0"
                              Margin="0,6,0,0" />
                 <Grid Height="52">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -797,7 +955,7 @@
                         <Button x:Name="TrayToggle" Style="{StaticResource Bare}" Padding="0,5" Click="Tray_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="VersionText" FontSize="12" VerticalAlignment="Center" />
-                                <Path Data="M0,0 L4,4 L0,8" StrokeThickness="1.4" Opacity="0.75" Margin="9,1,2,0"
+                                <Path x:Name="TrayChevron" Data="M0,0 L4,4 L0,8" StrokeThickness="1.4" Opacity="0.75" Margin="9,1,2,0"
                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                                       VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
@@ -892,7 +1050,7 @@
                         <TextBlock x:Name="SetupDoing" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock x:Name="SetupStatus" FontSize="14" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,12,0,18" />
                         <ProgressBar x:Name="SetupBar" Height="3" Minimum="0" Maximum="100" BorderThickness="0"
-                                     Background="#24FFFFFF" Foreground="{StaticResource Signal}" />
+                                     Background="#24FFFFFF" Foreground="{DynamicResource Signal}" />
                     </StackPanel>
 
                     <StackPanel x:Name="PageDone" Visibility="Collapsed">
@@ -939,11 +1097,15 @@
             </Border>
             <Grid x:Name="HintFrost">
                 <Rectangle Fill="{StaticResource Space}" />
-                <Grid>
-                    <Grid.CacheMode>
-                        <BitmapCache RenderAtScale="0.25" />
-                    </Grid.CacheMode>
-                    <Grid x:Name="HintSky" Effect="{StaticResource FrostBlur}" />
+                <Grid x:Name="HintSkyHost">
+                    <Grid x:Name="HintSky" />
+                </Grid>
+                <Grid x:Name="HintWallpaper" Visibility="Collapsed">
+                    <!-- wider than the window and tiled as mirror images, so the blur has picture to take in at the edges -->
+                    <Grid x:Name="HintWallpaperHost" Margin="-130">
+                        <Rectangle x:Name="HintWallpaperBox" />
+                    </Grid>
+                    <Rectangle Fill="#A6000000" />
                 </Grid>
                 <Rectangle Fill="{StaticResource Veil}" />
             </Grid>

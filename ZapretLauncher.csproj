@@ -11,7 +11,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ZapretLauncher</AssemblyName>
     <RootNamespace>ZapretLauncher</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>1.2.5</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <DebugType>none</DebugType>

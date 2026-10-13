@@ -76,18 +76,19 @@ namespace ZapretLauncher
             if (Width > work.Width) Width = work.Width - 20;
 
             BuildSky();
+            InitLook();
             Loaded += (s, e) =>
             {
                 var source = PresentationSource.FromVisual(this);
                 if (source != null && source.CompositionTarget != null) _dpiScale = source.CompositionTarget.TransformToDevice.M22;
                 CollectGlass(Shell);
                 UpdateFrost();
-                Drift(true);
+                UpdateDrift();
                 SetupCursor();
             };
             LayoutUpdated += (s, e) => UpdateFrost();
-            IsVisibleChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
-            StateChanged += (s, e) => Drift(IsVisible && WindowState != WindowState.Minimized);
+            IsVisibleChanged += (s, e) => UpdateDrift();
+            StateChanged += (s, e) => UpdateDrift();
 
             if (_setup == SetupMode.None) SetupTray();   // the wizard has no tray icon
         }
@@ -321,6 +322,8 @@ namespace ZapretLauncher
         // -------------------------------------------------------------- sky
         const double SkyW = 1200, SkyH = 840;   // one star tile; taller than the window
         readonly List<Tuple<TranslateTransform, double>> _drift = new List<Tuple<TranslateTransform, double>>();
+        readonly List<Tuple<List<Tuple<Point, double, int>>, TranslateTransform>> _starLayers =
+            new List<Tuple<List<Tuple<Point, double, int>>, TranslateTransform>>();
         readonly List<FrameworkElement> _glass = new List<FrameworkElement>();
         string _frostKey;
         bool _drifting;
@@ -328,7 +331,7 @@ namespace ZapretLauncher
         // Three tiled star layers. Each is drawn twice from the same stars and moved by the same transform:
         // sharp for the sky, and fat for the copy behind the glass, so the heavy blur leaves soft glows
         // drifting under the panels instead of wiping the stars out.
-        const double FrostGrow = 10;
+        const double FrostGrow = 10;     // at the blur the glass was drawn for; less blur, less fattening
         const double FrostGlow = 0.24;   // how bright those glows are
         static readonly byte[] StarAlpha = { 90, 160, 255 };
 
@@ -365,10 +368,23 @@ namespace ZapretLauncher
                     CacheMode = new BitmapCache(),
                     RenderTransform = move
                 });
-                var glow = StarBrush(stars, FrostGrow, FrostGlow, move);
+                _starLayers.Add(Tuple.Create(stars, move));
+                _drift.Add(Tuple.Create(move, l.Seconds));
+            }
+        }
+
+        // The copy of the sky under the glass. The stars are fattened in step with the blur: at the designed
+        // strength a star spreads into a soft glow, with no blur at all it is the very star seen through clear glass.
+        void BuildFrostSky()
+        {
+            double strength = Math.Min(1, _frostBlur.Radius / DesignBlur);
+            FrostSky.Children.Clear();
+            HintSky.Children.Clear();
+            foreach (var l in _starLayers)
+            {
+                var glow = StarBrush(l.Item1, 1 + (FrostGrow - 1) * strength, 1 + (FrostGlow - 1) * strength, l.Item2);
                 FrostSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
                 HintSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
-                _drift.Add(Tuple.Create(move, l.Seconds));
             }
         }
 
@@ -408,7 +424,13 @@ namespace ZapretLauncher
             };
         }
 
-        // The window lives in the tray most of the time, so the sky only moves while it is on screen.
+        // The window lives in the tray most of the time, so the sky only moves while it is on screen -
+        // and not at all behind a picture of the user's own.
+        void UpdateDrift()
+        {
+            Drift(IsLoaded && IsVisible && WindowState != WindowState.Minimized && !_wallpaperOn);
+        }
+
         void Drift(bool on)
         {
             if (on == _drifting) return;
@@ -550,7 +572,7 @@ namespace ZapretLauncher
             _state = st;
 
             string title, subtitle;
-            Color color, disc;
+            Color color;
             double glow = 0;
             bool pulse = false;
 
@@ -558,29 +580,29 @@ namespace ZapretLauncher
             {
                 case UiState.Missing:
                     title = "Нужна установка"; subtitle = "Нажмите, чтобы скачать компоненты zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); glow = 0.3; break;
+                    color = Hex("#BDBDBD"); glow = 0.3; break;
                 case UiState.Installing:
                     title = "Загрузка…"; subtitle = "Скачиваю и распаковываю zapret";
-                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); pulse = true; break;
+                    color = Hex("#BDBDBD"); pulse = true; break;
                 case UiState.Starting:
                     title = "Запуск…"; subtitle = "Подождите секунду";
-                    color = Hex("#D9D9D9"); disc = Hex("#59000000"); pulse = true; break;
+                    color = Hex("#D9D9D9"); pulse = true; break;
                 case UiState.Testing:
                     title = "Подбор стратегии"; subtitle = "Нажмите, чтобы отменить";
-                    color = Hex("#D9D9D9"); disc = Hex("#59000000"); pulse = true; break;
+                    color = Hex("#D9D9D9"); pulse = true; break;
                 case UiState.Running:
                     title = "Работает"; subtitle = "Обход блокировок включён";
-                    color = Hex("#FFFFFF"); disc = Hex("#40000000"); glow = 0.7; break;
+                    color = _accent; glow = 0.7; break;
                 default:
                     title = "Отключено"; subtitle = "Нажмите, чтобы включить";
-                    color = Hex("#8A8A8A"); disc = Hex("#73000000"); break;
+                    color = Hex("#8A8A8A"); break;
             }
             if (sub != null) subtitle = sub;
 
             StatusText.Text = title;
             SubText.Text = subtitle;
             StatusText.Foreground = new SolidColorBrush(st == UiState.Running ? color : Hex("#F2F2F2"));
-            Tint(color, disc, glow, pulse);
+            Tint(color, glow, pulse, st == UiState.Running);
 
             bool locked = st == UiState.Installing || st == UiState.Starting || st == UiState.Testing;
             StrategyList.IsEnabled = !locked;
@@ -606,34 +628,78 @@ namespace ZapretLauncher
             _tray.Text = "Zapret: " + (zapret ? "включён" : "выключен") + " · Прокси Telegram: " + (proxy ? "включён" : "выключен");
         }
 
-        void Tint(Color color, Color disc, double glow, bool pulse)
+        void Tint(Color color, double glow, bool pulse, bool on)
         {
-            Tint(Ring, PowerIcon, Disc, GlowFx, color, disc, glow, pulse);
+            Tint(Ring, PowerIcon, HaloIn, HaloOut, color, glow, pulse, on);
         }
 
-        // colours a power button: ring and glyph, the disc under them, and the glow (steady or pulsing)
-        static void Tint(System.Windows.Shapes.Shape ring, System.Windows.Shapes.Shape glyph, System.Windows.Shapes.Shape discShape,
-            DropShadowEffect fx, Color color, Color disc, double glow, bool pulse)
+        // Paints a power button. Off, there is only a hint of a glow around the black disc; while it is busy a
+        // thin ring breathes; on, the ring takes the accent colour and the corona behind the disc slowly flares.
+        static void Tint(System.Windows.Shapes.Shape ring, System.Windows.Shapes.Shape glyph,
+            FrameworkElement haloIn, FrameworkElement haloOut, Color color, double glow, bool pulse, bool on)
         {
-            var d = TimeSpan.FromMilliseconds(300);
-            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
+            var d = TimeSpan.FromMilliseconds(400);
+            Color edge = on ? color : pulse ? Hex("#AAAAAA") : Hex(glow > 0 ? "#66FFFFFF" : "#33FFFFFF");
+            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d));
+            ring.BeginAnimation(System.Windows.Shapes.Shape.StrokeThicknessProperty, new DoubleAnimation(on ? 2 : 1, d));
             ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
-            ((SolidColorBrush)discShape.Fill).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(disc, d));
-            fx.BeginAnimation(DropShadowEffect.ColorProperty, new ColorAnimation(color, d));
 
-            if (pulse)
+            if (on)
             {
-                fx.BeginAnimation(DropShadowEffect.OpacityProperty,
-                    new DoubleAnimation(0.15, 0.8, TimeSpan.FromMilliseconds(750))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = RepeatBehavior.Forever
-                    });
+                Breathe(haloIn, 0.55, 0.7, 1.05, 1600);
+                Breathe(haloOut, 0.18, 0.24, 1.08, 1600);
+            }
+            else if (pulse)
+            {
+                Breathe(haloIn, 0.15, 0.4, 1, 400);
+                Breathe(haloOut, 0, 0, 1, 0);
             }
             else
             {
-                fx.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(glow, d));
+                Breathe(haloIn, glow > 0 ? 0.18 : 0.1, 0, 1, 0);
+                Breathe(haloOut, 0, 0, 1, 0);
             }
+        }
+
+        // Fades a halo to "from" and, if a period is given, keeps it swinging between "from" and "to" while
+        // swelling it to "grow". The swing only starts once the fade is done, and not at all if the button
+        // has been repainted in the meantime.
+        static void Breathe(FrameworkElement halo, double from, double to, double grow, int halfMs)
+        {
+            var scale = (ScaleTransform)halo.RenderTransform;
+            var token = new object();
+            halo.Tag = token;
+
+            var settle = TimeSpan.FromMilliseconds(400);
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(1, settle));
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, settle));
+            var fade = new DoubleAnimation(from, settle);
+            if (halfMs > 0)
+            {
+                fade.Completed += (s, e) =>
+                {
+                    if (!ReferenceEquals(halo.Tag, token)) return;
+                    halo.BeginAnimation(OpacityProperty, Swing(from, to, halfMs));
+                    if (grow != 1)
+                    {
+                        scale.BeginAnimation(ScaleTransform.ScaleXProperty, Swing(1, grow, halfMs));
+                        scale.BeginAnimation(ScaleTransform.ScaleYProperty, Swing(1, grow, halfMs));
+                    }
+                };
+            }
+            halo.BeginAnimation(OpacityProperty, fade);
+        }
+
+        static DoubleAnimation Swing(double from, double to, int halfMs)
+        {
+            var swing = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(halfMs))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            Timeline.SetDesiredFrameRate(swing, 30);   // a slow glow does not need the monitor's full rate
+            return swing;
         }
 
         DispatcherTimer _logTimer;
@@ -678,9 +744,16 @@ namespace ZapretLauncher
         void RefreshVersion()
         {
             // the footer belongs to whichever tab is open
-            VersionText.Text = _proxyTab
+            VersionText.Text = _tab == Tab.Proxy
                 ? "TG WS Proxy: " + (TgProxy.InstalledVersion ?? (TgProxy.IsInstalled ? "установлен" : "не установлен"))
+                : _tab == Tab.Settings ? Installer.AppName + " " + Installer.Version
                 : "Компоненты zapret: " + (Engine.InstalledVersion ?? "не установлены");
+
+            // Update / Folder are about the components; the Settings tab has none
+            bool tray = _tab != Tab.Settings;
+            if (!tray && _trayOpen) Tray_Click(null, null);
+            TrayToggle.IsHitTestVisible = tray;
+            TrayChevron.Visibility = tray ? Visibility.Visible : Visibility.Collapsed;
         }
 
         void ReloadStrategies()
@@ -889,7 +962,7 @@ namespace ZapretLauncher
         {
             try
             {
-                if (_proxyTab) await ProxyInstallAsync(true);
+                if (_tab == Tab.Proxy) await ProxyInstallAsync(true);
                 else await InstallAsync(true);
             }
             catch (Exception ex) { Log("Ошибка: " + ex.Message); }
@@ -1012,7 +1085,7 @@ namespace ZapretLauncher
         {
             try
             {
-                if (_proxyTab)
+                if (_tab == Tab.Proxy)
                 {
                     ProxyFolder();
                     return;
