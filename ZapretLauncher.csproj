@@ -11,7 +11,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ZapretLauncher</AssemblyName>
     <RootNamespace>ZapretLauncher</RootNamespace>
-    <Version>1.2.6</Version>
+    <Version>1.3.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <DebugType>none</DebugType>
@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- Tray icon for "bypass off"; the "on" icon is app.ico itself -->
     <EmbeddedResource Include="app-off.ico" LogicalName="app-off.ico" />
+    <!-- The picture behind everything unless the user chooses another -->
+    <EmbeddedResource Include="background.jpg" LogicalName="background.jpg" />
   </ItemGroup>
 
   <!-- The installer is this same exe under another name: started as *Setup.exe it runs the setup wizard -->

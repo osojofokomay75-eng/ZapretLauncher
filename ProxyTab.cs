@@ -9,9 +9,10 @@ using System.Windows.Media.Animation;
 namespace ZapretLauncher
 {
     /// <summary>
-    /// The second tab: TG WS Proxy, a local proxy for Telegram. It mirrors the zapret tab - power button on
-    /// top, a card under it - and is meant to need one press: the power button starts the proxy and hands
-    /// it to Telegram. Its switches live on the Settings tab. Switching between the tabs is here as well.
+    /// The second tab: TG WS Proxy, a local proxy for Telegram. It mirrors the zapret tab - a large power
+    /// button in the middle - and is meant to need one press: the button starts the proxy and hands it to
+    /// Telegram. How to connect is told in a window opened by "Information"; the proxy's switches live on
+    /// the Settings tab. Switching between the tabs is here as well.
     /// </summary>
     public partial class MainWindow
     {
@@ -63,6 +64,7 @@ namespace ZapretLauncher
             if (tab == _tab) return;
             _tab = tab;
             HideHint();
+            CloseModal();
             MoveTabBar(true);
             RefreshVersion();
 
@@ -128,7 +130,7 @@ namespace ZapretLauncher
             Frost.BeginAnimation(OpacityProperty, arrive);
         }
 
-        // Slides the underline under the chosen tab; it stretches on the way and settles back.
+        // Slides the underline under the chosen tab.
         void MoveTabBar(bool animate)
         {
             var tab = _tab == Tab.Proxy ? TabProxy : _tab == Tab.Settings ? TabSettings : TabZapret;
@@ -143,13 +145,8 @@ namespace ZapretLauncher
                 return;
             }
 
-            var time = TimeSpan.FromMilliseconds(360);
             TabBarAt.BeginAnimation(TranslateTransform.XProperty,
-                new DoubleAnimation(x, time) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } });
-            var stretch = new DoubleAnimationUsingKeyFrames { Duration = time };
-            stretch.KeyFrames.Add(new EasingDoubleKeyFrame(2.2, KeyTime.FromPercent(0.45), new SineEase { EasingMode = EasingMode.EaseOut }));
-            stretch.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(1), new SineEase { EasingMode = EasingMode.EaseIn }));
-            TabBarStretch.BeginAnimation(ScaleTransform.ScaleXProperty, stretch);
+                new DoubleAnimation(x, TimeSpan.FromMilliseconds(360)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } });
         }
 
         // The white dot beside a tab's name: there while that tab's service is running, gone when it is not.
@@ -419,6 +416,8 @@ namespace ZapretLauncher
             }
             catch (Exception) { return false; }
         }
+
+        void ProxyInfo_Click(object sender, RoutedEventArgs e) { OpenModal(ProxyInfoPanel); }
 
         void PxConnect_Click(object sender, RoutedEventArgs e)
         {
