@@ -64,8 +64,8 @@ namespace ZapretLauncher
     public partial class MainWindow
     {
         const double WaveShift = 0.05;      // the shift at full strength, in window heights
-        const double WaveBreadth = 0.11;    // half the breadth of the front, in window heights
-        const int WaveMs = 1100;
+        const double WaveBreadth = 0.2;     // half the breadth of the front, in window heights: a long, gentle swell
+        const int WaveMs = 1800;
 
         DispatcherTimer _wavePreview;
 
@@ -90,10 +90,12 @@ namespace ZapretLauncher
 
             var wave = new WaveEffect { Centre = new Point(at.X / w, at.Y / h), Aspect = w / h, Breadth = WaveBreadth };
             var time = TimeSpan.FromMilliseconds(WaveMs);
-            var travel = new DoubleAnimation(0, reach, time) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            var travel = new DoubleAnimation(0, reach, time) { EasingFunction = new SineEase { EasingMode = EasingMode.EaseOut } };
             travel.Completed += (s, e) => { if (ReferenceEquals(Shell.Effect, wave)) Shell.Effect = null; };
-            // it weakens as it spreads
-            var fade = new DoubleAnimation(WaveShift * _s.Wave / 100.0, 0, time) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn } };
+            // it swells up rather than starting at full height, and dies away as it spreads
+            var fade = new DoubleAnimationUsingKeyFrames { Duration = time };
+            fade.KeyFrames.Add(new EasingDoubleKeyFrame(WaveShift * _s.Wave / 100.0, KeyTime.FromPercent(0.22), new SineEase { EasingMode = EasingMode.EaseOut }));
+            fade.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(1), new SineEase { EasingMode = EasingMode.EaseInOut }));
 
             Shell.Effect = wave;
             wave.BeginAnimation(WaveEffect.AmountProperty, fade);

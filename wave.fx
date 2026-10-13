@@ -20,11 +20,11 @@ float4 main(float2 uv : TEXCOORD) : COLOR
     float crest = exp(-across * across);     // dies out to either side of the front
 
     // a push outwards with a pull back behind it
-    float shift = amount * sin(across * 2.2) * crest;
+    float shift = amount * sin(across * 1.6) * crest;
     float2 along = away / max(far, 0.0001);
     along.x /= aspect;
 
     float4 colour = tex2D(picture, clamp(uv - along * shift, 0.001, 0.999));
-    colour.rgb += colour.rgb * crest * amount * 8;   // the crest catches a little light
+    colour.rgb += colour.rgb * crest * amount * 5;   // the crest catches a little light
     return colour;
 }
