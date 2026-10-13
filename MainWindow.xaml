@@ -484,7 +484,7 @@
         <!-- The picture behind everything - the launcher's own or the user's (Settings) - dimmed and, if asked,
              blurred. It is wider than the window and tiled as mirror images, so a blur has picture to take in
              at the edges instead of fading out there. -->
-        <Grid x:Name="Wallpaper" Visibility="Collapsed" IsHitTestVisible="False">
+        <Grid x:Name="Wallpaper" Visibility="Collapsed" IsHitTestVisible="False" ClipToBounds="True">
             <Grid x:Name="WallpaperHost" Margin="-130">
                 <Rectangle x:Name="WallpaperBox" />
             </Grid>
@@ -631,7 +631,7 @@
                     <Button x:Name="StrategiesButton" Style="{StaticResource Pill}" Padding="16,8" Margin="0,18,0,0" HorizontalAlignment="Center"
                             Click="Strategies_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#x1F4DC;" FontFamily="Segoe UI Emoji" FontSize="15" VerticalAlignment="Center" Margin="0,0,8,1" />
+                            <TextBlock Text="&#x1F4DC;" FontFamily="Segoe UI Emoji" FontSize="15" VerticalAlignment="Center" Margin="0,0,8,1" Opacity="0.5" />
                             <TextBlock Text="Список стратегий" FontSize="13.5" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
@@ -898,6 +898,20 @@
                                                VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
                                 </StackPanel>
                             </Grid>
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Волна при включении" FontSize="14" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="WaveSlider" Style="{StaticResource Slide}" Width="170" Minimum="0" Maximum="100"
+                                            LargeChange="10" SmallChange="1" Value="50" ValueChanged="Wave_Changed"
+                                            local:Hint.Text="Когда включается обход или прокси, по окну от кнопки расходится волна, искажающая картинку.&#x0a;&#x0a;Ползунок задаёт силу искажения; в крайнем левом положении волна выключена. Отпустите ползунок — волна покажет, что получилось." />
+                                    <TextBlock x:Name="WaveValue" Text="50%" Width="40" TextAlignment="Right" FontSize="12.5"
+                                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                                </StackPanel>
+                            </Grid>
                             <StackPanel Margin="0,9,0,0">
                                 <TextBlock Text="Акцентный цвет" FontSize="14" Foreground="{StaticResource Text}" />
                                 <TextBlock Text="Кнопка включения, индикаторы, переключатели, выделение в списках" FontSize="12"
@@ -905,7 +919,7 @@
                             </StackPanel>
                             <!-- The palette: across the square the colour gains saturation, down it loses brightness;
                                  the strip beside it picks the hue. Swatches and the field are shortcuts into it. -->
-                            <Grid Margin="0,12,0,0" Height="118">
+                            <Grid Margin="0,12,0,0" Height="104">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="12" />
@@ -1136,12 +1150,17 @@
             <Rectangle Fill="#8C000000" MouseLeftButtonDown="ModalShade_Down" />
             <!-- the title bar is shaded with the rest, so it does not stand out as a frame, but stays in use -->
             <Rectangle Fill="#8C000000" Height="44" VerticalAlignment="Top" Margin="0,-44,0,0" IsHitTestVisible="False" />
-            <Border x:Name="ModalShadow" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="16" Background="#000000"
-                    IsHitTestVisible="False">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.75" />
-                </Border.Effect>
-            </Border>
+            <!-- the shadow's blur is worked out once, into a bitmap; code sizes the grid 56 wider than the panel all round -->
+            <Grid x:Name="ModalShadow" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False">
+                <Grid.CacheMode>
+                    <BitmapCache RenderAtScale="0.5" />
+                </Grid.CacheMode>
+                <Border Margin="56" CornerRadius="16" Background="#000000">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.75" />
+                    </Border.Effect>
+                </Border>
+            </Grid>
             <Grid x:Name="ModalFrost" IsHitTestVisible="False" Margin="0,-44,0,0">
                 <Rectangle Fill="{StaticResource Space}" />
                 <Grid x:Name="ModalSkyHost">
@@ -1177,9 +1196,18 @@
                     <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.CanContentScroll="False" Padding="0"
-                             TextOptions.TextHintingMode="Fixed"
                              PreviewMouseWheel="StrategyList_Wheel"
-                             SelectionChanged="Strategy_Changed" />
+                             SelectionChanged="Strategy_Changed">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- "Display" fits every letter to whole pixels. Laid out the usual way ("Ideal"), letters
+                                     sit between pixels, and WPF draws them soft once the list has moved - whatever
+                                     the hinting mode says; measured on the real pixels, only this keeps them sharp. -->
+                                <TextBlock Text="{Binding Name}" TextOptions.TextFormattingMode="Display"
+                                           TextOptions.TextHintingMode="Fixed" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
             </Border>
             <Border x:Name="ProxyInfoPanel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24"
@@ -1262,11 +1290,17 @@
         <!-- Hint for the hovered button. It comes up in the middle of the window, over everything, so it
              carries its own piece of the same glass; code places it and clips HintFrost to its shape -->
         <Grid x:Name="HintLayer" IsHitTestVisible="False" Opacity="0" Visibility="Collapsed">
-            <Border x:Name="HintShadow" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="14" Background="#000000">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="28" ShadowDepth="0" Opacity="0.7" />
-                </Border.Effect>
-            </Border>
+            <!-- as with the window's shadow: blurred once into a bitmap; the grid is 40 wider than the hint all round -->
+            <Grid x:Name="HintShadow" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid.CacheMode>
+                    <BitmapCache RenderAtScale="0.5" />
+                </Grid.CacheMode>
+                <Border Margin="40" CornerRadius="14" Background="#000000">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="28" ShadowDepth="0" Opacity="0.7" />
+                    </Border.Effect>
+                </Border>
+            </Grid>
             <Grid x:Name="HintFrost">
                 <Rectangle Fill="{StaticResource Space}" />
                 <Grid x:Name="HintSkyHost">
@@ -1288,7 +1322,7 @@
         </Grid>
 
         <!-- The pointer: drawn here, not by Windows, so it can trail the mouse (see the cursor code) -->
-        <Canvas x:Name="CursorLayer" IsHitTestVisible="False" Opacity="0">
+        <Canvas x:Name="CursorLayer" IsHitTestVisible="False" Opacity="0" ClipToBounds="True">
             <Grid Width="64" Height="64" Canvas.Left="-32" Canvas.Top="-32">
                 <Grid.RenderTransform>
                     <TranslateTransform x:Name="CursorAt" />

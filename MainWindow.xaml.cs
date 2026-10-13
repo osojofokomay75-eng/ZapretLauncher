@@ -327,9 +327,10 @@ namespace ZapretLauncher
             double w = HintBox.ActualWidth, h = HintBox.ActualHeight;
             double x = Math.Round((Shell.ActualWidth - w) / 2), y = Math.Round((Shell.ActualHeight - h) / 2);
 
-            HintBox.Margin = HintShadow.Margin = new Thickness(x, y, 0, 0);
-            HintShadow.Width = w;
-            HintShadow.Height = h;
+            HintBox.Margin = new Thickness(x, y, 0, 0);
+            HintShadow.Margin = new Thickness(x - 40, y - 40, 0, 0);   // the shadow's bitmap is that much wider
+            HintShadow.Width = w + 80;
+            HintShadow.Height = h + 80;
             HintFrost.Clip = new RectangleGeometry(new Rect(x, y, w, h), 14, 14);
             HintLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(140)));
         }
@@ -375,9 +376,9 @@ namespace ZapretLauncher
             ModalFrost.Clip = new RectangleGeometry(at, 16, 16);
             // the shadow lives in the layer, which starts below the title bar
             var inLayer = _modal.TransformToAncestor(ModalLayer).Transform(new Point(0, 0));
-            ModalShadow.Margin = new Thickness(inLayer.X, inLayer.Y, 0, 0);
-            ModalShadow.Width = at.Width;
-            ModalShadow.Height = at.Height;
+            ModalShadow.Margin = new Thickness(inLayer.X - 56, inLayer.Y - 56, 0, 0);   // the shadow's bitmap is that much wider
+            ModalShadow.Width = at.Width + 112;
+            ModalShadow.Height = at.Height + 112;
         }
 
         void ModalShade_Down(object sender, MouseButtonEventArgs e) { CloseModal(); }
@@ -460,23 +461,48 @@ namespace ZapretLauncher
         void FitSky()
         {
             double width = (Math.Ceiling(ActualWidth / SkyW) + 1) * SkyW, height = Math.Ceiling(ActualHeight / SkyH) * SkyH;
+            bool grew = false;
             foreach (var sheet in _skySheets)
             {
-                if (sheet.Width < width) sheet.Width = width;
-                if (sheet.Height < height) sheet.Height = height;
+                if (sheet.Width < width) { sheet.Width = width; grew = true; }
+                if (sheet.Height < height) { sheet.Height = height; grew = true; }
             }
+            if (grew) BuildFrostSky();   // the copies under the glass are sheets of the same size
         }
 
         // The copy of the sky under the glass. The stars are fattened in step with the blur: at the designed
         // strength a star spreads into a soft glow, with no blur at all it is the very star seen through clear glass.
+        //
+        // Like the sharp layers, each layer of the copy is a sheet drawn - and blurred - once, into a bitmap,
+        // and then only slid along by the layer's transform. Blurring the moving stars afresh for every step
+        // of the drift is what used to cost a frame now and then.
         void BuildFrostSky()
         {
             double strength = Math.Min(1, _frostBlur.Radius / DesignBlur);
             foreach (var copy in SkyCopies()) copy.Children.Clear();
-            foreach (var l in _starLayers)
+            for (int i = 0; i < _starLayers.Count; i++)
             {
-                var glow = StarBrush(l.Item1, 1 + (FrostGrow - 1) * strength, 1 + (FrostGlow - 1) * strength, l.Item2);
-                foreach (var copy in SkyCopies()) copy.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
+                var l = _starLayers[i];
+                // The sheet reaches past the window on every side, so the blur has stars to take in at the
+                // edges; the brush is shifted back by as much, to keep its tiles in step with the sharp layer.
+                var glow = StarBrush(l.Item1, 1 + (FrostGrow - 1) * strength, 1 + (FrostGlow - 1) * strength,
+                    new TranslateTransform(Bleed, Bleed));
+                foreach (var copy in SkyCopies())
+                {
+                    var sheet = new System.Windows.Shapes.Rectangle
+                    {
+                        Width = _skySheets[i].Width + Bleed * 2,
+                        Height = _skySheets[i].Height + Bleed * 2,
+                        Fill = glow,
+                        Effect = _frostBlur
+                    };
+                    System.Windows.Controls.Canvas.SetLeft(sheet, -Bleed);
+                    System.Windows.Controls.Canvas.SetTop(sheet, -Bleed);
+                    // a canvas, because anything else would clip a child larger than itself
+                    var slide = new System.Windows.Controls.Canvas { CacheMode = new BitmapCache(_frostScale), RenderTransform = l.Item2 };
+                    slide.Children.Add(sheet);
+                    copy.Children.Add(slide);
+                }
             }
         }
 
@@ -661,6 +687,7 @@ namespace ZapretLauncher
 
         void SetState(UiState st, string sub = null)
         {
+            bool cameOn = st == UiState.Running && _state != UiState.Running;
             _state = st;
 
             string title, subtitle;
@@ -705,6 +732,7 @@ namespace ZapretLauncher
 
             SetDot(TabZapret, st == UiState.Running);
             UpdateTray();
+            if (cameOn) WaveFor(Tab.Zapret);
         }
 
         // One tray icon for the bypass and the Telegram proxy: lit while either is running, with both named

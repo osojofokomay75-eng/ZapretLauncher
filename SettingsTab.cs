@@ -30,6 +30,7 @@ namespace ZapretLauncher
         readonly BlurEffect _backBlur = new BlurEffect { RenderingBias = RenderingBias.Performance };
         Color _accent = Colors.White;
         bool _wallpaperOn, _lookReady;
+        double _frostScale = 0.25;   // the size, against full size, at which the copies under the glass are kept
         DispatcherTimer _saveTimer;
 
         // Everything under a piece of glass exists three times: under the panels, under the hint and under
@@ -44,9 +45,7 @@ namespace ZapretLauncher
         /// <summary>Puts the saved looks on the window. Called once, from the constructor.</summary>
         void InitLook()
         {
-            foreach (var sky in SkyCopies()) sky.Effect = _frostBlur;
             foreach (var box in PictureBoxes()) box.Effect = _frostBlur;
-            WallpaperBox.Effect = _backBlur;
             Shell.SizeChanged += (s, e) => FitWallpaper();
 
             ApplyAccent(ParseColor(_s.Accent) ?? Colors.White);
@@ -55,6 +54,8 @@ namespace ZapretLauncher
             BlurSlider.Value = _s.Blur;
             BrightSlider.Value = _s.BackBright;
             BgBlurSlider.Value = _s.BackBlur;
+            WaveSlider.Value = _s.Wave;
+            ShowWave();
             ShowAccent();
             _lookReady = true;
         }
@@ -193,8 +194,11 @@ namespace ZapretLauncher
 
             double radius = _s.BackBlur * BackBlurPerPercent;
             _backBlur.Radius = radius;
-            // sharp, it is drawn as it is; blurred, small and stretched like the copies under the glass
-            WallpaperHost.CacheMode = radius < 1 ? null : new BitmapCache(Math.Min(1, Math.Max(0.25, 18 / radius)));
+            WallpaperBox.Effect = radius < 1 ? null : _backBlur;
+            // The picture is always kept as a bitmap: drawn straight from its brush - scaled, tiled and
+            // mirrored - it is rasterised in software, over again for every frame anything above it moves.
+            // Sharp, the bitmap is full size; blurred, small and stretched like the copies under the glass.
+            WallpaperHost.CacheMode = new BitmapCache(radius < 1 ? 1 : Math.Min(1, Math.Max(0.25, 18 / radius)));
 
             BrightValue.Text = _s.BackBright + "%";
             BgBlurValue.Text = _s.BackBlur + "%";
@@ -282,8 +286,8 @@ namespace ZapretLauncher
 
             // The copies under the glass are drawn small and stretched: a heavy blur hides that and costs a
             // fraction. A light blur would show the pixels, so the lighter it is, the closer to full size.
-            double scale = Math.Min(1, Math.Max(0.25, 18 / Math.Max(radius, 1)));
-            foreach (var host in SkyHosts().Concat(PictureHosts())) host.CacheMode = new BitmapCache(scale);
+            _frostScale = Math.Min(1, Math.Max(0.25, 18 / Math.Max(radius, 1)));
+            foreach (var host in PictureHosts()) host.CacheMode = new BitmapCache(_frostScale);
 
             BuildFrostSky();
             BlurValue.Text = _s.Blur + "%";
