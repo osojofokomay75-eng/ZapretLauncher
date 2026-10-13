@@ -121,6 +121,30 @@ namespace ZapretLauncher
             c.DefaultRequestHeaders.UserAgent.ParseAdd("ZapretLauncher/1.0");
             return c;
         }
+
+        /// <summary>Downloads a file; progress runs from 0 to 1 when the server says how big the file is.</summary>
+        public static async Task DownloadAsync(string url, string path, IProgress<double> progress)
+        {
+            using (var c = Client())
+            using (var resp = await c.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+            {
+                resp.EnsureSuccessStatusCode();
+                long total = resp.Content.Headers.ContentLength ?? -1;
+                using (var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                using (var dst = File.Create(path))
+                {
+                    var buf = new byte[81920];
+                    long read = 0;
+                    int n;
+                    while ((n = await src.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
+                    {
+                        await dst.WriteAsync(buf, 0, n).ConfigureAwait(false);
+                        read += n;
+                        if (total > 0 && progress != null) progress.Report((double)read / total);
+                    }
+                }
+            }
+        }
     }
 
     // -------------------------------------------------------------- engine
