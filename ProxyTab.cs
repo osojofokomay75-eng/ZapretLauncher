@@ -161,6 +161,7 @@ namespace ZapretLauncher
         // ------------------------------------------------------------ state
         void SetProxyState(ProxyState st)
         {
+            bool cameOn = st == ProxyState.Running && _pxState != ProxyState.Running;
             _pxState = st;
 
             string title, subtitle;
@@ -200,6 +201,7 @@ namespace ZapretLauncher
 
             SetDot(TabProxy, st == ProxyState.Running);
             UpdateTray();
+            if (cameOn) WaveFor(Tab.Proxy);
         }
 
         async void PxPower_Click(object sender, RoutedEventArgs e)

@@ -42,6 +42,7 @@ namespace ZapretLauncher
         public int Blur = 60;               // how much the glass blurs what is under it, 0..100
         public int BackBright = 50;         // how bright the picture is left, 0..100
         public int BackBlur;                // how much the picture itself is blurred, 0..100
+        public int Wave = 50;               // how strong the ripple of switching on is, 0..100; 0 is none
         public string Accent = "#FFFFFF";   // the accent colour
         public int WindowWidth, WindowHeight;   // the size the window was left at; 0 until it has been resized
 
@@ -77,6 +78,9 @@ namespace ZapretLauncher
                         case "backblur":
                             if (int.TryParse(v, out blur)) s.BackBlur = Math.Max(0, Math.Min(100, blur));
                             break;
+                        case "wave":
+                            if (int.TryParse(v, out blur)) s.Wave = Math.Max(0, Math.Min(100, blur));
+                            break;
                         case "width": int.TryParse(v, out s.WindowWidth); break;
                         case "height": int.TryParse(v, out s.WindowHeight); break;
                     }
@@ -105,6 +109,7 @@ namespace ZapretLauncher
                     "accent=" + Accent,
                     "backbright=" + BackBright,
                     "backblur=" + BackBlur,
+                    "wave=" + Wave,
                     "width=" + WindowWidth,
                     "height=" + WindowHeight,
                 });

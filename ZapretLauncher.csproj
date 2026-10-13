@@ -11,7 +11,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ZapretLauncher</AssemblyName>
     <RootNamespace>ZapretLauncher</RootNamespace>
-    <Version>1.3.0.1</Version>
+    <Version>1.3.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <DebugType>none</DebugType>
@@ -33,6 +33,9 @@
     <EmbeddedResource Include="app-off.ico" LogicalName="app-off.ico" />
     <!-- The picture behind everything unless the user chooses another -->
     <EmbeddedResource Include="background.jpg" LogicalName="background.jpg" />
+    <!-- The ripple's pixel shader, compiled from wave.fx (how is told in that file) -->
+    <EmbeddedResource Include="wave.ps" LogicalName="wave.ps" />
+    <None Include="wave.fx" />
   </ItemGroup>
 
   <!-- The installer is this same exe under another name: started as *Setup.exe it runs the setup wizard -->
