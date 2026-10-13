@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -206,6 +207,10 @@ namespace ZapretLauncher
         }
 
         // ----------------------------------------------------------- accent
+        // The accent as the palette shows it. Kept apart from the colour itself: black has no hue and grey no
+        // saturation to read back, and the marks must not jump when a drag passes through them.
+        double _hue, _sat, _val = 1;
+
         static Color? ParseColor(string text)
         {
             var m = Regex.Match((text ?? "").Trim(), "^#?([0-9a-fA-F]{6})$");
@@ -215,6 +220,33 @@ namespace ZapretLauncher
         }
 
         static string HexOf(Color c) { return "#" + c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2"); }
+
+        /// <summary>Hue in degrees, saturation and value 0..1.</summary>
+        static Color FromHsv(double hue, double sat, double val)
+        {
+            double c = val * sat, h = hue / 60 % 6, x = c * (1 - Math.Abs(h % 2 - 1)), m = val - c;
+            double r = 0, g = 0, b = 0;
+            if (h < 1) { r = c; g = x; }
+            else if (h < 2) { r = x; g = c; }
+            else if (h < 3) { g = c; b = x; }
+            else if (h < 4) { g = x; b = c; }
+            else if (h < 5) { r = x; b = c; }
+            else { r = c; b = x; }
+            return Color.FromRgb((byte)Math.Round((r + m) * 255), (byte)Math.Round((g + m) * 255), (byte)Math.Round((b + m) * 255));
+        }
+
+        static void ToHsv(Color color, out double hue, out double sat, out double val)
+        {
+            double r = color.R / 255.0, g = color.G / 255.0, b = color.B / 255.0;
+            double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), span = max - min;
+            val = max;
+            sat = max <= 0 ? 0 : span / max;
+            if (span <= 0) hue = 0;
+            else if (max == r) hue = 60 * ((g - b) / span % 6);
+            else if (max == g) hue = 60 * ((b - r) / span + 2);
+            else hue = 60 * ((r - g) / span + 4);
+            if (hue < 0) hue += 360;
+        }
 
         /// <summary>
         /// Repaints everything that carries the accent. The brushes are replaced rather than recoloured:
@@ -229,12 +261,17 @@ namespace ZapretLauncher
             Resources["SignalSoft"] = Frozen(new SolidColorBrush(Color.FromRgb(
                 (byte)(color.R * 0.64), (byte)(color.G * 0.64), (byte)(color.B * 0.64))));
 
-            // the power buttons are coloured from code
-            if (IsLoaded && _setup == SetupMode.None)
-            {
-                SetState(_state, SubText.Text);
-                SetProxyState(_pxState);
-            }
+            // what a button that is on takes from the accent without being bound to it: its ring and its caption
+            if (!IsLoaded || _setup != SetupMode.None) return;
+            if (_state == UiState.Running) Recolour(Ring, StatusText);
+            if (_pxState == ProxyState.Running) Recolour(PxRing, PxStatus);
+        }
+
+        void Recolour(System.Windows.Shapes.Shape ring, TextBlock caption)
+        {
+            // an animation holds the ring's colour (see Tint), so the new one has to go in as an animation too
+            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(_accent, TimeSpan.Zero));
+            caption.Foreground = new SolidColorBrush(_accent);
         }
 
         static Brush Frozen(Brush brush)
@@ -243,8 +280,9 @@ namespace ZapretLauncher
             return brush;
         }
 
-        // marks the swatch of the current accent, if it is one of them, and writes it out in the field
-        void ShowAccent()
+        // Shows the current accent in the controls that choose it: ticks its swatch, if it is one of them,
+        // writes it out in the field and, unless the palette is where it came from, moves the palette's marks.
+        void ShowAccent(bool fromPalette = false)
         {
             bool ready = _lookReady;
             _lookReady = false;   // ticking a swatch here is not the user choosing it
@@ -252,7 +290,26 @@ namespace ZapretLauncher
                 swatch.IsChecked = ((SolidColorBrush)swatch.Background).Color == _accent;
             AccentHex.Text = HexOf(_accent);
             _lookReady = ready;
+
+            if (!fromPalette)
+            {
+                double hue;
+                ToHsv(_accent, out hue, out _sat, out _val);
+                if (_sat > 0 && _val > 0) _hue = hue;   // a grey keeps the hue the palette was on
+            }
+            SvHue.Fill = new SolidColorBrush(FromHsv(_hue, 1, 1));
+            PlaceMarks();
         }
+
+        void PlaceMarks()
+        {
+            if (SvBox.ActualWidth <= 0) return;
+            Canvas.SetLeft(SvMark, _sat * SvBox.ActualWidth - SvMark.Width / 2);
+            Canvas.SetTop(SvMark, (1 - _val) * SvBox.ActualHeight - SvMark.Height / 2);
+            Canvas.SetTop(HueMark, _hue / 360 * HueBox.ActualHeight - HueMark.Height / 2);
+        }
+
+        void Palette_SizeChanged(object sender, SizeChangedEventArgs e) { PlaceMarks(); }
 
         void SetAccent(Color color)
         {
@@ -261,6 +318,55 @@ namespace ZapretLauncher
             ApplyAccent(color);
             ShowAccent();
         }
+
+        // the colour under the palette's marks becomes the accent; called on every step of a drag
+        void PickAccent()
+        {
+            var color = FromHsv(_hue, _sat, _val);
+            _s.Accent = HexOf(color);
+            SaveSoon();
+            ApplyAccent(color);
+            ShowAccent(true);
+        }
+
+        static double Share(double at, double of) { return of <= 0 ? 0 : Math.Max(0, Math.Min(1, at / of)); }
+
+        void SvAt(Point at)
+        {
+            _sat = Share(at.X, SvBox.ActualWidth);
+            _val = 1 - Share(at.Y, SvBox.ActualHeight);
+            PickAccent();
+        }
+
+        void HueAt(Point at)
+        {
+            _hue = Math.Min(359.9, Share(at.Y, HueBox.ActualHeight) * 360);
+            PickAccent();
+        }
+
+        void Sv_Down(object sender, MouseButtonEventArgs e)
+        {
+            SvBox.CaptureMouse();   // so the drag goes on outside the square
+            SvAt(e.GetPosition(SvBox));
+        }
+
+        void Sv_Move(object sender, MouseEventArgs e)
+        {
+            if (SvBox.IsMouseCaptured) SvAt(e.GetPosition(SvBox));
+        }
+
+        void Hue_Down(object sender, MouseButtonEventArgs e)
+        {
+            HueBox.CaptureMouse();
+            HueAt(e.GetPosition(HueBox));
+        }
+
+        void Hue_Move(object sender, MouseEventArgs e)
+        {
+            if (HueBox.IsMouseCaptured) HueAt(e.GetPosition(HueBox));
+        }
+
+        void Palette_Up(object sender, MouseButtonEventArgs e) { ((UIElement)sender).ReleaseMouseCapture(); }
 
         void Accent_Checked(object sender, RoutedEventArgs e)
         {

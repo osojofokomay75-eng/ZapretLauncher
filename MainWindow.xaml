@@ -2,15 +2,15 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ZapretLauncher"
-        Title="Zapret Launcher" Width="1152" Height="826"
-        WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
+        Title="Zapret Launcher" Width="1152" Height="826" MinWidth="1060" MinHeight="680"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResize"
         Background="#050505" UseLayoutRounding="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
     <!-- Opaque window with a client-drawn frame. A layered (AllowsTransparency) window is copied back
          from the GPU on every frame, which made dragging stutter while the sky is animating -->
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="1" CornerRadius="0"
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="1" CornerRadius="0"
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
@@ -140,7 +140,8 @@
             </Setter>
         </Style>
 
-        <!-- Tab in the title bar: the open one is underlined with the same kind of bar that marks the chosen strategy.
+        <!-- Tab in the title bar. The open one is underlined with the same kind of bar that marks the chosen
+             strategy; that bar is a single one, beside the tabs, and slides to whichever is chosen (TabBar).
              The dot beside the name, the size of the pointer's, is lit from code while that tab's service is running. -->
         <Style x:Key="Tab" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
@@ -153,8 +154,6 @@
                     <ControlTemplate TargetType="RadioButton">
                         <Grid Background="Transparent">
                             <ContentPresenter Margin="12,9,12,12" HorizontalAlignment="Center" />
-                            <Border x:Name="Bar" Width="18" Height="3" CornerRadius="2" VerticalAlignment="Bottom"
-                                    Margin="0,0,0,4" Background="{DynamicResource Signal}" Visibility="Hidden" />
                             <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{DynamicResource Signal}" Opacity="0" IsHitTestVisible="False"
                                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4,2">
                                 <Ellipse.Effect>
@@ -167,7 +166,6 @@
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -524,13 +522,27 @@
                     <TextBlock Text="Zapret" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text=" Launcher" FontSize="15" Foreground="{StaticResource Faint}" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <RadioButton x:Name="TabZapret" Content="Zapret" Style="{StaticResource Tab}" IsChecked="True" Checked="Tab_Checked" />
-                    <RadioButton x:Name="TabProxy" Content="TG WS Proxy" Style="{StaticResource Tab}" Checked="Tab_Checked" />
-                    <RadioButton x:Name="TabSettings" Content="Настройки" Style="{StaticResource Tab}" Checked="Tab_Checked" />
-                </StackPanel>
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <StackPanel x:Name="TabStrip" Orientation="Horizontal">
+                        <RadioButton x:Name="TabZapret" Content="Zapret" Style="{StaticResource Tab}" IsChecked="True" Checked="Tab_Checked" />
+                        <RadioButton x:Name="TabProxy" Content="TG WS Proxy" Style="{StaticResource Tab}" Checked="Tab_Checked" />
+                        <RadioButton x:Name="TabSettings" Content="Настройки" Style="{StaticResource Tab}" Checked="Tab_Checked" />
+                    </StackPanel>
+                    <!-- The underline of the open tab; code slides it under the tab that is chosen -->
+                    <Border x:Name="TabBar" Width="18" Height="3" CornerRadius="2" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            Margin="0,0,0,4" Background="{DynamicResource Signal}" IsHitTestVisible="False" Opacity="0"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="TabBarStretch" />
+                                <TranslateTransform x:Name="TabBarAt" />
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                    </Border>
+                </Grid>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                     <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click" />
+                    <Button x:Name="MaxButton" Style="{StaticResource TitleBtn}" Content="&#xE922;" Click="Max_Click" />
                     <Button Style="{StaticResource TitleBtn}" Content="&#xE8BB;" Click="Close_Click" />
                 </StackPanel>
             </Grid>
@@ -545,10 +557,22 @@
                 <!-- Power disc and status -->
                 <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <Grid Width="150" Height="150">
-                        <!-- An eclipse: a black disc with a corona of the accent colour behind it. The corona is two
-                             blurred discs, a tight bright one and a wide faint one; each is drawn once into a
-                             bitmap, and code only fades and swells those (see Tint). -->
+                        <!-- A disc of the same frosted glass as the panels, with a corona of the accent colour around it.
+                             The corona is two blurred discs, a tight bright one and a wide faint one; each is drawn
+                             once into a bitmap, and code only fades and swells those (see Tint). The glyph is a
+                             lighter, see-through tint of the glass and does not take the accent. -->
                         <Canvas IsHitTestVisible="False">
+                            <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
+                            <Canvas.Clip>
+                                <CombinedGeometry GeometryCombineMode="Exclude">
+                                    <CombinedGeometry.Geometry1>
+                                        <RectangleGeometry Rect="-110,-110,370,370" />
+                                    </CombinedGeometry.Geometry1>
+                                    <CombinedGeometry.Geometry2>
+                                        <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
+                                    </CombinedGeometry.Geometry2>
+                                </CombinedGeometry>
+                            </Canvas.Clip>
                             <Grid x:Name="HaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
                                   RenderTransformOrigin="0.5,0.5">
                                 <Grid.CacheMode>
@@ -578,7 +602,7 @@
                                 </Ellipse>
                             </Grid>
                         </Canvas>
-                        <Ellipse x:Name="Disc" Width="124" Height="124" Fill="#000000" />
+                        <Ellipse x:Name="Disc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="62" />
                         <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="1">
                             <Ellipse.Stroke>
                                 <SolidColorBrush Color="#33FFFFFF" />
@@ -589,7 +613,7 @@
                                 <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
                                       StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
                                     <Path.Stroke>
-                                        <SolidColorBrush Color="#9A9A9A" />
+                                        <SolidColorBrush Color="#47FFFFFF" />
                                     </Path.Stroke>
                                 </Path>
                             </Canvas>
@@ -646,6 +670,17 @@
                 <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <Grid Width="150" Height="150">
                         <Canvas IsHitTestVisible="False">
+                            <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
+                            <Canvas.Clip>
+                                <CombinedGeometry GeometryCombineMode="Exclude">
+                                    <CombinedGeometry.Geometry1>
+                                        <RectangleGeometry Rect="-110,-110,370,370" />
+                                    </CombinedGeometry.Geometry1>
+                                    <CombinedGeometry.Geometry2>
+                                        <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
+                                    </CombinedGeometry.Geometry2>
+                                </CombinedGeometry>
+                            </Canvas.Clip>
                             <Grid x:Name="PxHaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
                                   RenderTransformOrigin="0.5,0.5">
                                 <Grid.CacheMode>
@@ -675,7 +710,7 @@
                                 </Ellipse>
                             </Grid>
                         </Canvas>
-                        <Ellipse x:Name="PxDisc" Width="124" Height="124" Fill="#000000" />
+                        <Ellipse x:Name="PxDisc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="62" />
                         <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="1">
                             <Ellipse.Stroke>
                                 <SolidColorBrush Color="#33FFFFFF" />
@@ -686,7 +721,7 @@
                                 <Path x:Name="PxIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
                                       StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
                                     <Path.Stroke>
-                                        <SolidColorBrush Color="#9A9A9A" />
+                                        <SolidColorBrush Color="#47FFFFFF" />
                                     </Path.Stroke>
                                 </Path>
                             </Canvas>
@@ -782,7 +817,7 @@
 
             <!-- Settings tab: everything there is to tune - the bypass, the proxy, the program itself and its looks
                  (SettingsTab.cs). The switches are the same controls the other tabs used to carry. -->
-            <Grid x:Name="SettingsView" Grid.Row="1" Visibility="Collapsed" Margin="24,6,24,8">
+            <Grid x:Name="SettingsView" Grid.Row="1" Visibility="Collapsed" Margin="24,6,24,8" MaxWidth="1320">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="14" />
@@ -806,16 +841,16 @@
                                            Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                             </StackPanel>
                             <UniformGrid Rows="1" Margin="-4,0">
-                                <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}"
+                                <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}" Padding="6,6"
                                         Margin="4" Click="UserList_Click"
                                         local:Hint.Text="list-general-user.txt — сайты, которые нужно разблокировать дополнительно.&#x0a;&#x0a;Кому нужно: если сайт заблокирован и не открывается даже с включённым обходом.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com — без https:// и без пути. Поддомены подхватятся сами. Не оставляйте файл пустым.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                                <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}"
+                                <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}" Padding="6,6"
                                         Margin="4" Click="UserList_Click"
                                         local:Hint.Text="list-exclude-user.txt — сайты, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: если с включённым обходом перестал работать обычный сайт или сервис — банк, игра, рабочий портал.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                                <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}"
+                                <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}" Padding="6,6"
                                         Margin="4" Click="UserList_Click"
                                         local:Hint.Text="ipset-exclude-user.txt — IP-адреса и подсети, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: опытным пользователям — когда ломается то, у чего нет доменного имени: игровой сервер, VPN, устройство в домашней сети.&#x0a;&#x0a;Что делать: впишите адреса по одному в строке, например 192.168.0.0/16 или 203.0.113.5.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                                <Button Content="Папка lists" Style="{StaticResource Pill}"
+                                <Button Content="Папка lists" Style="{StaticResource Pill}" Padding="6,6"
                                         Margin="4" Click="ListsFolder_Click"
                                         local:Hint.Text="Открывает папку со всеми списками zapret.&#x0a;&#x0a;Кому нужно: тем, кто хочет посмотреть, какие сайты и адреса уже входят в обход, или подложить готовый список.&#x0a;&#x0a;Важно: основные файлы (list-general.txt, ipset-all.txt и другие) перезаписываются при обновлении компонентов. Свои правки вносите только в файлы с user в названии — они сохраняются." />
                             </UniformGrid>
@@ -924,19 +959,82 @@
                                 <TextBlock Text="Кнопка включения, индикаторы, переключатели, выделение в списках" FontSize="12"
                                            Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                             </StackPanel>
-                            <StackPanel x:Name="AccentSwatches" Orientation="Horizontal" Margin="-5,10,0,0">
-                                <RadioButton Style="{StaticResource Swatch}" Background="#FFFFFF" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#7AB8FF" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#5EEAD4" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#86EFAC" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#FDE047" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#FDBA74" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#FB7185" Checked="Accent_Checked" />
-                                <RadioButton Style="{StaticResource Swatch}" Background="#C4B5FD" Checked="Accent_Checked" />
-                                <TextBox x:Name="AccentHex" Style="{StaticResource Field}" Width="92" Margin="10,0,0,0" MaxLength="7"
-                                         VerticalAlignment="Center" LostFocus="AccentHex_LostFocus" KeyDown="AccentHex_KeyDown"
-                                         local:Hint.Text="Свой цвет: шесть шестнадцатеричных цифр, например #7AB8FF, и Enter.&#x0a;&#x0a;Интерфейс тёмный, поэтому светлые и яркие цвета видны лучше тёмных." />
-                            </StackPanel>
+                            <!-- The palette: across the square the colour gains saturation, down it loses brightness;
+                                 the strip beside it picks the hue. Swatches and the field are shortcuts into it. -->
+                            <Grid Margin="0,12,0,0" Height="118">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid x:Name="SvBox" Background="Transparent" Cursor="Hand" SizeChanged="Palette_SizeChanged"
+                                      MouseLeftButtonDown="Sv_Down" MouseMove="Sv_Move" MouseLeftButtonUp="Palette_Up">
+                                    <Rectangle x:Name="SvHue" RadiusX="9" RadiusY="9" Fill="#FF0000" />
+                                    <Rectangle RadiusX="9" RadiusY="9">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Rectangle RadiusX="9" RadiusY="9" Stroke="{StaticResource Edge}" StrokeThickness="1">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#00000000" Offset="0" />
+                                                <GradientStop Color="#FF000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Canvas IsHitTestVisible="False">
+                                        <Ellipse x:Name="SvMark" Width="14" Height="14" Stroke="#FFFFFF" StrokeThickness="2">
+                                            <Ellipse.Effect>
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="0" Opacity="0.9" />
+                                            </Ellipse.Effect>
+                                        </Ellipse>
+                                    </Canvas>
+                                </Grid>
+                                <Grid x:Name="HueBox" Grid.Column="2" Background="Transparent" Cursor="Hand"
+                                      MouseLeftButtonDown="Hue_Down" MouseMove="Hue_Move" MouseLeftButtonUp="Palette_Up">
+                                    <Rectangle RadiusX="7" RadiusY="7">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#FF0000" Offset="0" />
+                                                <GradientStop Color="#FFFF00" Offset="0.1667" />
+                                                <GradientStop Color="#00FF00" Offset="0.3333" />
+                                                <GradientStop Color="#00FFFF" Offset="0.5" />
+                                                <GradientStop Color="#0000FF" Offset="0.6667" />
+                                                <GradientStop Color="#FF00FF" Offset="0.8333" />
+                                                <GradientStop Color="#FF0000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Canvas IsHitTestVisible="False">
+                                        <Rectangle x:Name="HueMark" Width="20" Height="5" Canvas.Left="-3" RadiusX="2.5" RadiusY="2.5" Fill="#FFFFFF">
+                                            <Rectangle.Effect>
+                                                <DropShadowEffect BlurRadius="4" ShadowDepth="0" Opacity="0.9" />
+                                            </Rectangle.Effect>
+                                        </Rectangle>
+                                    </Canvas>
+                                </Grid>
+                                <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                    <UniformGrid x:Name="AccentSwatches" Columns="4" Margin="0,0,-7,0">
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#FFFFFF" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#7AB8FF" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#5EEAD4" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#86EFAC" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#FDE047" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#FDBA74" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#FB7185" Checked="Accent_Checked" />
+                                    <RadioButton Style="{StaticResource Swatch}" Margin="0,0,7,6" Background="#C4B5FD" Checked="Accent_Checked" />
+                                    </UniformGrid>
+                                    <TextBox x:Name="AccentHex" Style="{StaticResource Field}" Margin="0,6,0,0" MaxLength="7"
+                                             LostFocus="AccentHex_LostFocus" KeyDown="AccentHex_KeyDown"
+                                             local:Hint.Text="Свой цвет: шесть шестнадцатеричных цифр, например #7AB8FF, и Enter.&#x0a;&#x0a;Интерфейс тёмный, поэтому светлые и яркие цвета видны лучше тёмных." />
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>
