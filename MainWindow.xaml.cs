@@ -71,6 +71,12 @@ namespace ZapretLauncher
             InitializeComponent();
             if (setup != SetupMode.None) StartSetup(setup, setupDir);
 
+            // the window comes back at the size it was left at
+            if (setup == SetupMode.None && _s.WindowWidth > 0 && _s.WindowHeight > 0)
+            {
+                Width = Math.Max(MinWidth, _s.WindowWidth);
+                Height = Math.Max(MinHeight, _s.WindowHeight);
+            }
             var work = SystemParameters.WorkArea;
             if (Height > work.Height) Height = work.Height - 20;
             if (Width > work.Width) Width = work.Width - 20;
@@ -85,10 +91,27 @@ namespace ZapretLauncher
                 UpdateFrost();
                 UpdateDrift();
                 SetupCursor();
+                MoveTabBar(false);
             };
             LayoutUpdated += (s, e) => UpdateFrost();
             IsVisibleChanged += (s, e) => UpdateDrift();
-            StateChanged += (s, e) => UpdateDrift();
+            StateChanged += (s, e) =>
+            {
+                UpdateDrift();
+                // A maximized window with a client-drawn frame hangs over the screen's edges by the width of
+                // the resize border; the content steps back by as much.
+                bool max = WindowState == WindowState.Maximized;
+                Shell.Margin = new Thickness(max ? 7 : 0);
+                MaxButton.Content = max ? "\uE923" : "\uE922";
+            };
+            SizeChanged += (s, e) =>
+            {
+                FitSky();
+                if (!IsLoaded || _setup != SetupMode.None || WindowState != WindowState.Normal) return;
+                _s.WindowWidth = (int)Math.Round(ActualWidth);
+                _s.WindowHeight = (int)Math.Round(ActualHeight);
+                SaveSoon();
+            };
 
             if (_setup == SetupMode.None) SetupTray();   // the wizard has no tray icon
         }
@@ -322,6 +345,7 @@ namespace ZapretLauncher
         // -------------------------------------------------------------- sky
         const double SkyW = 1200, SkyH = 840;   // one star tile; taller than the window
         readonly List<Tuple<TranslateTransform, double>> _drift = new List<Tuple<TranslateTransform, double>>();
+        readonly List<System.Windows.Shapes.Rectangle> _skySheets = new List<System.Windows.Shapes.Rectangle>();
         readonly List<Tuple<List<Tuple<Point, double, int>>, TranslateTransform>> _starLayers =
             new List<Tuple<List<Tuple<Point, double, int>>, TranslateTransform>>();
         readonly List<FrameworkElement> _glass = new List<FrameworkElement>();
@@ -360,16 +384,30 @@ namespace ZapretLauncher
                 // The sharp layer is a cached bitmap two tiles wide that slides across the window. Sliding a
                 // bitmap costs nothing; re-drawing hundreds of stars on every step made each step drop a frame,
                 // which showed as smeared text whenever the list was scrolling.
-                Sky.Children.Add(new System.Windows.Shapes.Rectangle
+                var sheet = new System.Windows.Shapes.Rectangle
                 {
                     Width = SkyW * 2,
                     Height = SkyH,
                     Fill = StarBrush(stars, 1, 1, Transform.Identity),
                     CacheMode = new BitmapCache(),
                     RenderTransform = move
-                });
+                };
+                Sky.Children.Add(sheet);
+                _skySheets.Add(sheet);
                 _starLayers.Add(Tuple.Create(stars, move));
                 _drift.Add(Tuple.Create(move, l.Seconds));
+            }
+        }
+
+        // The sharp layers are bitmaps of whole tiles: enough of them to cover the window, plus one across for
+        // the slide. They only ever grow, so dragging the window's edge back and forth does not redraw them.
+        void FitSky()
+        {
+            double width = (Math.Ceiling(ActualWidth / SkyW) + 1) * SkyW, height = Math.Ceiling(ActualHeight / SkyH) * SkyH;
+            foreach (var sheet in _skySheets)
+            {
+                if (sheet.Width < width) sheet.Width = width;
+                if (sheet.Height < height) sheet.Height = height;
             }
         }
 
@@ -633,8 +671,8 @@ namespace ZapretLauncher
             Tint(Ring, PowerIcon, HaloIn, HaloOut, color, glow, pulse, on);
         }
 
-        // Paints a power button. Off, there is only a hint of a glow around the black disc; while it is busy a
-        // thin ring breathes; on, the ring takes the accent colour and the corona behind the disc slowly flares.
+        // Paints a power button. Off, there is only a hint of a glow around the glass disc; while it is busy a
+        // thin ring breathes; on, the ring takes the accent colour and the corona around the disc slowly flares.
         static void Tint(System.Windows.Shapes.Shape ring, System.Windows.Shapes.Shape glyph,
             FrameworkElement haloIn, FrameworkElement haloOut, Color color, double glow, bool pulse, bool on)
         {
@@ -642,7 +680,8 @@ namespace ZapretLauncher
             Color edge = on ? color : pulse ? Hex("#AAAAAA") : Hex(glow > 0 ? "#66FFFFFF" : "#33FFFFFF");
             ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d));
             ring.BeginAnimation(System.Windows.Shapes.Shape.StrokeThicknessProperty, new DoubleAnimation(on ? 2 : 1, d));
-            ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
+            Color tint = Hex(on ? "#A6FFFFFF" : pulse ? "#73FFFFFF" : glow > 0 ? "#5CFFFFFF" : "#47FFFFFF");
+            ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(tint, d));
 
             if (on)
             {
@@ -1027,11 +1066,21 @@ namespace ZapretLauncher
         void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
+            if (e.ClickCount == 2 && ResizeMode == ResizeMode.CanResize)
+            {
+                Max_Click(sender, e);
+                return;
+            }
             DragMove();
             PressCursor(false);   // the move loop swallows the button-up
         }
 
         void Min_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
+
+        void Max_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }
 
         void Close_Click(object sender, RoutedEventArgs e) { Close(); }
 

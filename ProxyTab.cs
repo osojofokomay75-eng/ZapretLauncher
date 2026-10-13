@@ -30,7 +30,9 @@ namespace ZapretLauncher
         readonly ProxyRunner _proxy = new ProxyRunner();
         ProxyConfig _px;
         ProxyState _pxState = ProxyState.Idle;
-        Tab _tab = Tab.Zapret;
+        Tab _tab = Tab.Zapret;      // the tab that is chosen
+        Tab _shown = Tab.Zapret;    // the tab whose view is on screen; behind _tab while one fades into the other
+        System.Windows.Threading.DispatcherTimer _tabTimer;
         bool _pxOwnTray;    // out of sight the proxy would not start this time, so it runs with its own tray icon
         Action<string> _openLink = link => Process.Start(link);
 
@@ -54,15 +56,62 @@ namespace ZapretLauncher
             ShowTab(ReferenceEquals(sender, TabProxy) ? Tab.Proxy : ReferenceEquals(sender, TabSettings) ? Tab.Settings : Tab.Zapret);
         }
 
+        // The underline leaves at once; the views take their time: the old one fades out and, a third of a
+        // second after the click, the new one fades in.
         void ShowTab(Tab tab)
         {
             if (tab == _tab) return;
             _tab = tab;
             HideHint();
-            var views = new[] { ZapretView, ProxyView, SettingsView };
-            for (int i = 0; i < views.Length; i++)
-                views[i].Visibility = i == (int)tab ? Visibility.Visible : Visibility.Collapsed;
+            MoveTabBar(true);
             RefreshVersion();
+
+            // the launcher opens on the service last looked at; Settings is a place to visit, not to start from
+            string name = tab == Tab.Proxy ? "proxy" : "zapret";
+            if (tab != Tab.Settings && _s.Tab != name)
+            {
+                _s.Tab = name;
+                _s.Save();
+            }
+
+            if (!IsLoaded)
+            {
+                SwapViews(false);   // nothing is on screen yet to fade
+                return;
+            }
+
+            var old = TabViews()[(int)_shown];
+            old.IsHitTestVisible = false;   // a view on its way out takes no more clicks
+            var leave = new DoubleAnimation(0, TimeSpan.FromMilliseconds(200));
+            old.BeginAnimation(OpacityProperty, leave);
+            Frost.BeginAnimation(OpacityProperty, leave);   // the panels' glass is drawn apart from them, so it fades apart
+
+            if (_tabTimer == null)
+            {
+                _tabTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(340) };
+                _tabTimer.Tick += (s, e) =>
+                {
+                    _tabTimer.Stop();
+                    SwapViews(true);
+                };
+            }
+            // another tab chosen in the meantime simply takes this one's place
+            _tabTimer.Stop();
+            _tabTimer.Start();
+        }
+
+        FrameworkElement[] TabViews() { return new FrameworkElement[] { ZapretView, ProxyView, SettingsView }; }
+
+        // Puts the chosen tab's view on screen in place of the one that was there.
+        void SwapViews(bool fade)
+        {
+            var views = TabViews();
+            for (int i = 0; i < views.Length; i++)
+            {
+                views[i].Visibility = i == (int)_tab ? Visibility.Visible : Visibility.Collapsed;
+                views[i].IsHitTestVisible = true;
+            }
+            _shown = _tab;
 
             // the glass has to be cut out again for the panels of the tab now on screen
             if (IsLoaded)
@@ -73,15 +122,34 @@ namespace ZapretLauncher
                 _frostKey = null;
                 UpdateFrost();
             }
-            views[(int)tab].BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
 
-            // the launcher opens on the service last looked at; Settings is a place to visit, not to start from
-            string name = tab == Tab.Proxy ? "proxy" : "zapret";
-            if (tab != Tab.Settings && _s.Tab != name)
+            var arrive = fade ? new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) : null;
+            foreach (var view in views) view.BeginAnimation(OpacityProperty, ReferenceEquals(view, views[(int)_tab]) ? arrive : null);
+            Frost.BeginAnimation(OpacityProperty, arrive);
+        }
+
+        // Slides the underline under the chosen tab; it stretches on the way and settles back.
+        void MoveTabBar(bool animate)
+        {
+            var tab = _tab == Tab.Proxy ? TabProxy : _tab == Tab.Settings ? TabSettings : TabZapret;
+            if (tab.ActualWidth <= 0) return;   // not laid out yet; the window calls again once it is
+            double x = tab.TranslatePoint(new Point(tab.ActualWidth / 2, 0), TabStrip).X - TabBar.Width / 2;
+
+            if (!animate || TabBar.Opacity == 0)
             {
-                _s.Tab = name;
-                _s.Save();
+                TabBarAt.BeginAnimation(TranslateTransform.XProperty, null);
+                TabBarAt.X = x;
+                TabBar.Opacity = 1;
+                return;
             }
+
+            var time = TimeSpan.FromMilliseconds(360);
+            TabBarAt.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(x, time) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } });
+            var stretch = new DoubleAnimationUsingKeyFrames { Duration = time };
+            stretch.KeyFrames.Add(new EasingDoubleKeyFrame(2.2, KeyTime.FromPercent(0.45), new SineEase { EasingMode = EasingMode.EaseOut }));
+            stretch.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(1), new SineEase { EasingMode = EasingMode.EaseIn }));
+            TabBarStretch.BeginAnimation(ScaleTransform.ScaleXProperty, stretch);
         }
 
         // The white dot beside a tab's name: there while that tab's service is running, gone when it is not.

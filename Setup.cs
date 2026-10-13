@@ -328,8 +328,11 @@ namespace ZapretLauncher
             _setup = mode;
             _setupDir = dir;
 
-            Width = 760;
-            Height = 540;
+            // the wizard is a fixed card, not a window to stretch
+            ResizeMode = ResizeMode.CanMinimize;
+            MinWidth = Width = 760;
+            MinHeight = Height = 540;
+            MaxButton.Visibility = Visibility.Collapsed;
             MainView.Visibility = Visibility.Collapsed;
             SetupView.Visibility = Visibility.Visible;
 
