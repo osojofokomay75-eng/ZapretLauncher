@@ -2,8 +2,11 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
@@ -13,6 +16,8 @@ namespace ZapretLauncher
     /// <summary>
     /// The installer is the launcher itself: any copy that is not the installed one shows the setup wizard
     /// (--portable skips it), and --uninstall shows the removal wizard, both inside the main window.
+    /// An installer never installs a stale version: if a newer one has been released, it downloads that
+    /// version's installer and hands the job over to it.
     /// </summary>
     public enum SetupMode { None, Install, Uninstall }
 
@@ -26,6 +31,107 @@ namespace ZapretLauncher
         public static string SelfPath { get { return Process.GetCurrentProcess().MainModule.FileName; } }
 
         public static string Version { get { return typeof(Installer).Assembly.GetName().Version.ToString(3); } }
+
+        // --------------------------------------------- a newer installer
+        const string Releases = "https://github.com/pikacu1337/ZapretLauncher/releases";
+        const string SetupAsset = "ZapretLauncherSetup.exe";
+
+        /// <summary>
+        /// The latest release, if it is newer than this copy; otherwise null. It follows the releases page's
+        /// "latest" address to the tag it stands for rather than asking the GitHub API, which answers one
+        /// address only so many times an hour - and an installer that cannot ask installs an old version.
+        /// </summary>
+        public static async Task<ReleaseInfo> FindNewerAsync()
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            using (var handler = new HttpClientHandler { AllowAutoRedirect = false })
+            using (var c = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) })
+            {
+                c.DefaultRequestHeaders.UserAgent.ParseAdd("ZapretLauncher/" + Version);
+                string url = Releases + "/latest";
+                // one hop to the tag; one more in front of it if the repository has been renamed
+                for (int hop = 0; hop < 5; hop++)
+                {
+                    using (var resp = await c.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+                    {
+                        var next = resp.Headers.Location;
+                        if (next == null) return null;
+                        url = (next.IsAbsoluteUri ? next : new Uri(new Uri(url), next)).ToString();
+                    }
+                    var m = Regex.Match(url, @"^(https://github\.com/[^/]+/[^/]+/releases)/tag/([^/?#]+)$");
+                    if (!m.Success) continue;
+
+                    string tag = Uri.UnescapeDataString(m.Groups[2].Value);
+                    if (!IsNewer(tag)) return null;
+                    return new ReleaseInfo { Tag = tag, Url = m.Groups[1].Value + "/download/" + m.Groups[2].Value + "/" + SetupAsset };
+                }
+                return null;
+            }
+        }
+
+        /// <summary>Whether a release tag such as "v1.2" or "v1.2.1" stands for a later version than this copy.</summary>
+        public static bool IsNewer(string tag)
+        {
+            string text = (tag ?? "").TrimStart('v', 'V');
+            if (text.IndexOf('.') < 0) text += ".0";
+            System.Version theirs;
+            if (!System.Version.TryParse(text, out theirs)) return false;
+
+            var ours = typeof(Installer).Assembly.GetName().Version;
+            // "1.2" and "1.2.0" are the same release
+            return new System.Version(theirs.Major, theirs.Minor, Math.Max(theirs.Build, 0))
+                 > new System.Version(ours.Major, ours.Minor, Math.Max(ours.Build, 0));
+        }
+
+        /// <summary>Downloads that release's installer into %TEMP% and returns where it is.</summary>
+        public static async Task<string> DownloadSetupAsync(ReleaseInfo release, IProgress<double> progress)
+        {
+            string name = new string(release.Tag.Where(ch => char.IsLetterOrDigit(ch) || ch == '.').ToArray());
+            string path = Path.Combine(Path.GetTempPath(), "ZapretLauncherSetup-" + name + ".exe");
+            try
+            {
+                await Web.DownloadAsync(release.Url, path, progress).ConfigureAwait(false);
+
+                // an installer is a couple of hundred kilobytes; an error page or a file cut short is not one
+                var head = new byte[2];
+                using (var file = File.OpenRead(path))
+                {
+                    if (file.Length < 100 * 1024 || file.Read(head, 0, 2) != 2 || head[0] != 'M' || head[1] != 'Z')
+                        throw new Exception("скачанный файл не похож на установщик");
+                }
+                return path;
+            }
+            catch
+            {
+                try { File.Delete(path); } catch { }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// What the newer installer is started with: --continue tells it to go straight to installing with
+        /// the choices already made here. An installer that does not know these simply shows its wizard.
+        /// </summary>
+        public static string HandOverArgs(string dir, bool desktop, bool autostart)
+        {
+            // backslashes right before the closing quote have to be doubled, or they swallow it ("E:\" -> "E:\\")
+            string tail = new string('\\', dir.Length - dir.TrimEnd('\\').Length);
+            return "--setup --continue --dir \"" + dir + tail + "\" --desktop " + (desktop ? "1" : "0")
+                + " --autostart " + (autostart ? "1" : "0");
+        }
+
+        public static void HandOver(string setup, string dir, bool desktop, bool autostart)
+        {
+            // started from this, already elevated, process: no second UAC prompt
+            Process.Start(new ProcessStartInfo(setup, HandOverArgs(dir, desktop, autostart)) { UseShellExecute = false });
+        }
+
+        /// <summary>The value that follows a switch on the command line, or null.</summary>
+        public static string ArgAfter(string[] args, string name)
+        {
+            int i = Array.IndexOf(args, name);
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        }
 
         public static string DefaultDir
         {
@@ -212,6 +318,7 @@ namespace ZapretLauncher
         SetupPage _setupPage;
         string _setupDir, _installedExe;
         bool _setupBusy, _setupFailed, _selfDelete;
+        bool _handedOver;   // an older installer started this one to finish its job: no looking for a still newer one
 
         void StartSetup(SetupMode mode, string dir)
         {
@@ -227,6 +334,21 @@ namespace ZapretLauncher
             SetupVersion.Text = "Версия " + Installer.Version;
             SetupPath.Text = Installer.ExistingDir() ?? Installer.DefaultDir;
             GoTo(mode == SetupMode.Install ? SetupPage.Welcome : SetupPage.Remove);
+        }
+
+        /// <summary>
+        /// An older installer found this, newer, one and passed on what the user had chosen in it:
+        /// take those choices and go straight to installing.
+        /// </summary>
+        public void ContinueInstall(string[] args)
+        {
+            string dir = Installer.ArgAfter(args, "--dir");
+            if (!string.IsNullOrWhiteSpace(dir)) SetupPath.Text = dir;
+            SetupDesktop.IsChecked = Installer.ArgAfter(args, "--desktop") != "0";
+            SetupAutostart.IsChecked = Installer.ArgAfter(args, "--autostart") == "1";
+            _handedOver = true;
+            GoTo(SetupPage.Options);   // where a path that turns out to be wrong can be corrected
+            RunInstall();
         }
 
         void GoTo(SetupPage page)
@@ -310,6 +432,42 @@ namespace ZapretLauncher
             GoTo(SetupPage.Working);
 
             string note = "";
+
+            // Installers get passed around for years; what they install should not be that old.
+            // If a newer version is out, its installer is fetched and carries on from this very point.
+            if (!_handedOver)
+            {
+                ReleaseInfo newer = null;
+                bool handed = false;
+                try
+                {
+                    SetupStatus.Text = "Проверяю, нет ли версии новее";
+                    newer = await Installer.FindNewerAsync();
+                    if (newer != null)
+                    {
+                        SetupDoing.Text = "Обновление установщика…";
+                        SetupStatus.Text = "Вышла версия " + newer.Tag.TrimStart('v') + " — скачиваю её установщик";
+                        SetupBar.IsIndeterminate = false;
+                        string setup = await Installer.DownloadSetupAsync(newer, new Progress<double>(p => SetupBar.Value = p * 100));
+                        Installer.HandOver(setup, dir, desktop, autostart);
+                        handed = true;
+                    }
+                }
+                catch (Exception) { }   // GitHub out of reach, a download cut short: this version will have to do
+
+                if (handed)
+                {
+                    _setupBusy = false;
+                    Close();
+                    return;
+                }
+                if (newer != null)
+                    note += "\n\nВышла версия " + newer.Tag.TrimStart('v') + ", но скачать её установщик не удалось — установлена версия " + Installer.Version + ".";
+                SetupDoing.Text = "Установка…";
+                SetupBar.Value = 0;
+                SetupBar.IsIndeterminate = true;
+            }
+
             try
             {
                 SetupStatus.Text = "Копирую файлы и создаю ярлыки";

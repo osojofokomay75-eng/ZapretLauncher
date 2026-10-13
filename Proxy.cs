@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -75,25 +74,7 @@ namespace ZapretLauncher
             string tmp = Exe + ".download";
             try
             {
-                using (var c = Web.Client())
-                using (var resp = await c.GetAsync(rel.Url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
-                {
-                    resp.EnsureSuccessStatusCode();
-                    long total = resp.Content.Headers.ContentLength ?? -1;
-                    using (var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                    using (var dst = File.Create(tmp))
-                    {
-                        var buf = new byte[81920];
-                        long read = 0;
-                        int n;
-                        while ((n = await src.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
-                        {
-                            await dst.WriteAsync(buf, 0, n).ConfigureAwait(false);
-                            read += n;
-                            if (total > 0 && progress != null) progress.Report((double)read / total);
-                        }
-                    }
-                }
+                await Web.DownloadAsync(rel.Url, tmp, progress).ConfigureAwait(false);
 
                 // the proxy is a ~20 MB one-file build; anything tiny is an error page or a file an antivirus cut short
                 if (!File.Exists(tmp) || new FileInfo(tmp).Length < 1024 * 1024)

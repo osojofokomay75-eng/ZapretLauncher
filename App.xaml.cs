@@ -89,6 +89,8 @@ namespace ZapretLauncher
             var window = new MainWindow(false, mode, dir);
             MainWindow = window;
             window.Show();
+            // an older installer downloaded this one to finish the installation it had begun
+            if (mode == SetupMode.Install && args.Contains("--continue")) window.ContinueInstall(args);
             return true;
         }
     }
