@@ -756,6 +756,7 @@ namespace ZapretLauncher
         {
             _s.GameFilter = GameToggle.IsChecked == true;
             _s.Save();
+            foreach (var s in _strategies) s.Works = false;
             if (_state == UiState.Running)
             {
                 await StopAsync();
@@ -786,26 +787,32 @@ namespace ZapretLauncher
             _s.Save();
         }
 
+        // Tries every strategy in turn and marks each one that works in the list, instead of stopping at
+        // the first. When it is done, the first working one is switched on; any other marked row can be picked.
         async void Auto_Click(object sender, RoutedEventArgs e)
         {
             if (_strategies.Count == 0) return;
 
             _cts = new CancellationTokenSource();
             var ct = _cts.Token;
-            Strategy winner = null;
+            var working = new List<Strategy>();
+            foreach (var s in _strategies) s.Works = false;
 
             SetState(UiState.Testing);
             try
             {
                 if (_runner.IsRunning) await Task.Run(() => _runner.Stop());
 
-                for (int i = 0; i < _strategies.Count && winner == null; i++)
+                for (int i = 0; i < _strategies.Count; i++)
                 {
                     ct.ThrowIfCancellationRequested();
                     var st = _strategies[i];
-                    Log("Проверка " + (i + 1) + " из " + _strategies.Count + ": " + st.Name);
+                    Log("Проверка " + (i + 1) + " из " + _strategies.Count + ": " + st.Name
+                        + (working.Count > 0 ? " · рабочих: " + working.Count : ""));
                     SubText.Text = st.Name;
+                    StrategyList.ScrollIntoView(st);
 
+                    // Start() stops whatever the previous round left running
                     try { await Task.Run(() => _runner.Start(st, _s.GameFilter), ct); }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception) { continue; }
@@ -813,31 +820,38 @@ namespace ZapretLauncher
                     await Task.Delay(1800, ct);
                     if (!_runner.IsRunning) continue;
 
-                    if (await Probe.OkAsync(ct)) winner = st;
-                    else await Task.Run(() => _runner.Stop());
+                    if (await Probe.OkAsync(ct))
+                    {
+                        st.Works = true;
+                        working.Add(st);
+                    }
                 }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { Log("Ошибка подбора: " + ex.Message); }
 
-            if (winner != null)
+            await Task.Run(() => _runner.Stop());
+            bool cancelled = ct.IsCancellationRequested;
+
+            if (working.Count > 0 && !cancelled)
             {
+                var first = working[0];
                 _suppress = true;
-                StrategyList.SelectedItem = winner;
+                StrategyList.SelectedItem = first;
                 _suppress = false;
-                StrategyList.ScrollIntoView(winner);
-                _s.Strategy = winner.Name;
+                StrategyList.ScrollIntoView(first);
+                _s.Strategy = first.Name;
                 _s.Save();
-                _runningName = winner.Name;
-                SetState(UiState.Running, "Стратегия: " + winner.Name);
-                Log("Найдена рабочая стратегия: " + winner.Name);
+
+                await StartAsync();
+                if (_state == UiState.Running)
+                    Log("Рабочих стратегий: " + working.Count + " из " + _strategies.Count + " — отмечены в списке. Включена " + first.Name);
             }
             else
             {
-                await Task.Run(() => _runner.Stop());
                 SetState(UiState.Idle);
-                Log(ct.IsCancellationRequested
-                    ? "Подбор отменён"
+                Log(working.Count > 0 ? "Подбор остановлен. Рабочих найдено: " + working.Count + " — отмечены в списке"
+                    : cancelled ? "Подбор отменён"
                     : "Рабочая стратегия не найдена — попробуйте вручную или обновите компоненты");
             }
         }
