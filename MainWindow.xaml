@@ -138,6 +138,42 @@
             </Setter>
         </Style>
 
+        <!-- Tab in the title bar: the open one is underlined with the same kind of bar that marks the chosen strategy.
+             The dot beside the name, the size of the pointer's, is lit from code while that tab's service is running. -->
+        <Style x:Key="Tab" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Margin" Value="8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Background="Transparent">
+                            <ContentPresenter Margin="12,9,12,12" HorizontalAlignment="Center" />
+                            <Border x:Name="Bar" Width="18" Height="3" CornerRadius="2" VerticalAlignment="Bottom"
+                                    Margin="0,0,0,4" Background="{StaticResource Signal}" Visibility="Hidden" />
+                            <Ellipse x:Name="Dot" Width="8" Height="8" Fill="#FFFFFF" Opacity="0" IsHitTestVisible="False"
+                                     HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4,2">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect Color="#FFFFFF" BlurRadius="12" ShadowDepth="0" Opacity="0.75" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Compact pill for the footer tray -->
         <Style x:Key="PillSmall" TargetType="Button" BasedOn="{StaticResource Pill}">
             <Setter Property="FontSize" Value="11.5" />
@@ -391,10 +427,7 @@
         <Grid x:Name="MainView">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -405,149 +438,354 @@
                     <TextBlock Text="Zapret" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text=" Launcher" FontSize="15" Foreground="{StaticResource Faint}" />
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <RadioButton x:Name="TabZapret" Content="Zapret" Style="{StaticResource Tab}" IsChecked="True" Checked="Tab_Checked" />
+                    <RadioButton x:Name="TabProxy" Content="TG WS Proxy" Style="{StaticResource Tab}" Checked="Tab_Checked" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
                     <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click" />
                     <Button Style="{StaticResource TitleBtn}" Content="&#xE8BB;" Click="Close_Click" />
                 </StackPanel>
             </Grid>
 
-            <!-- Power disc and status -->
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,16">
-                <Grid Width="150" Height="150">
-                    <Ellipse x:Name="Disc" Width="124" Height="124">
-                        <Ellipse.Fill>
-                            <SolidColorBrush Color="#73000000" />
-                        </Ellipse.Fill>
-                    </Ellipse>
-                    <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="3">
-                        <Ellipse.Stroke>
-                            <SolidColorBrush Color="#6B6B6B" />
-                        </Ellipse.Stroke>
-                        <Ellipse.Effect>
-                            <DropShadowEffect x:Name="GlowFx" Color="#6B6B6B" BlurRadius="40" ShadowDepth="0" Opacity="0" />
-                        </Ellipse.Effect>
-                    </Ellipse>
-                    <Viewbox Width="46" Height="46" IsHitTestVisible="False">
-                        <Canvas Width="24" Height="24">
-                            <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
-                                  StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
-                                <Path.Stroke>
-                                    <SolidColorBrush Color="#9A9A9A" />
-                                </Path.Stroke>
-                            </Path>
-                        </Canvas>
-                    </Viewbox>
-                    <Button x:Name="PowerButton" Style="{StaticResource Ghost}" Width="124" Height="124"
-                            Click="Power_Click" />
-                </Grid>
+            <!-- Zapret tab -->
+            <Grid x:Name="ZapretView" Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <TextBlock x:Name="StatusText" Text="Отключено" FontSize="24" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
-                <TextBlock x:Name="SubText" Text="Нажмите, чтобы включить" FontSize="13" MaxWidth="520"
-                           TextAlignment="Center" TextTrimming="CharacterEllipsis"
-                           HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
-            </StackPanel>
-
-            <!-- Strategy list, centred between the power button and the options -->
-            <Border Grid.Row="2" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,14">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Grid Margin="12,10,12,8">
-                        <StackPanel HorizontalAlignment="Center">
-                            <TextBlock Text="Стратегия обхода" FontSize="14" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Если сайты не открываются, выберите другую" FontSize="12"
-                                       HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                        </StackPanel>
-                        <Button x:Name="AutoButton" Content="Автоподбор" Style="{StaticResource Pill}"
-                                HorizontalAlignment="Right" VerticalAlignment="Center" Click="Auto_Click" />
+                <!-- Power disc and status -->
+                <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <Grid Width="150" Height="150">
+                        <Ellipse x:Name="Disc" Width="124" Height="124">
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#73000000" />
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="3">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#6B6B6B" />
+                            </Ellipse.Stroke>
+                            <Ellipse.Effect>
+                                <DropShadowEffect x:Name="GlowFx" Color="#6B6B6B" BlurRadius="40" ShadowDepth="0" Opacity="0" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <Viewbox Width="46" Height="46" IsHitTestVisible="False">
+                            <Canvas Width="24" Height="24">
+                                <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
+                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                    <Path.Stroke>
+                                        <SolidColorBrush Color="#9A9A9A" />
+                                    </Path.Stroke>
+                                </Path>
+                            </Canvas>
+                        </Viewbox>
+                        <Button x:Name="PowerButton" Style="{StaticResource Ghost}" Width="124" Height="124"
+                                Click="Power_Click" />
                     </Grid>
 
-                    <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.CanContentScroll="False" Padding="0"
-                             TextOptions.TextHintingMode="Fixed"
-                             PreviewMouseWheel="StrategyList_Wheel"
-                             SelectionChanged="Strategy_Changed" />
+                    <TextBlock x:Name="StatusText" Text="Отключено" FontSize="24" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                    <TextBlock x:Name="SubText" Text="Нажмите, чтобы включить" FontSize="13" MaxWidth="520"
+                               TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                               HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
+                </StackPanel>
+
+                <!-- Strategy list, centred between the power button and the options -->
+                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Margin="12,10,12,8">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Стратегия обхода" FontSize="14" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Если сайты не открываются, выберите другую" FontSize="12"
+                                           HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button x:Name="AutoButton" Content="Автоподбор" Style="{StaticResource Pill}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="Auto_Click" />
+                        </Grid>
+
+                        <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.CanContentScroll="False" Padding="0"
+                                 TextOptions.TextHintingMode="Fixed"
+                                 PreviewMouseWheel="StrategyList_Wheel"
+                                 SelectionChanged="Strategy_Changed" />
+                    </Grid>
+                </Border>
+
+                <!-- Options -->
+                <Grid Grid.Row="2" Height="94" Margin="24,0,24,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="GameToggle" Style="{StaticResource Switch}" Click="Game_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Игровой фильтр" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Обход для игровых портов 1024–65535" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="CloseToggle" Style="{StaticResource Switch}" Click="CloseToTray_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Сворачивать в трей" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Закрытие окна не завершает программу" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="AutostartToggle" Style="{StaticResource Switch}" Click="Autostart_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
                 </Grid>
-            </Border>
 
-            <!-- Options -->
-            <Grid Grid.Row="3" Height="94" Margin="24,0,24,14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource Card}" Padding="16,0">
-                    <CheckBox x:Name="GameToggle" Style="{StaticResource Switch}" Click="Game_Click" VerticalAlignment="Center">
-                        <StackPanel>
-                            <TextBlock Text="Игровой фильтр" FontSize="14" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Обход для игровых портов 1024–65535" FontSize="12"
+                <!-- User lists -->
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="24,0,24,8" Padding="16,9,12,9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
+                            <TextBlock Text="Свои списки" FontSize="14" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
                                        Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                         </StackPanel>
-                    </CheckBox>
-                </Border>
-
-                <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,0">
-                    <CheckBox x:Name="CloseToggle" Style="{StaticResource Switch}" Click="CloseToTray_Click" VerticalAlignment="Center">
-                        <StackPanel>
-                            <TextBlock Text="Сворачивать в трей" FontSize="14" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Закрытие окна не завершает программу" FontSize="12"
-                                       Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </CheckBox>
-                </Border>
-
-                <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,0">
-                    <CheckBox x:Name="AutostartToggle" Style="{StaticResource Switch}" Click="Autostart_Click" VerticalAlignment="Center">
-                        <StackPanel>
-                            <TextBlock Text="Запускать вместе с Windows" FontSize="14" Foreground="{StaticResource Text}" />
-                            <TextBlock Text="Включается сам, в трее и без запроса UAC" FontSize="12"
-                                       Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </CheckBox>
+                        <UniformGrid Grid.Column="1" Rows="1">
+                            <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}"
+                                    Margin="4" Click="UserList_Click"
+                                    local:Hint.Text="list-general-user.txt — сайты, которые нужно разблокировать дополнительно.&#x0a;&#x0a;Кому нужно: если сайт заблокирован и не открывается даже с включённым обходом.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com — без https:// и без пути. Поддомены подхватятся сами. Не оставляйте файл пустым.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                            <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}"
+                                    Margin="4" Click="UserList_Click"
+                                    local:Hint.Text="list-exclude-user.txt — сайты, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: если с включённым обходом перестал работать обычный сайт или сервис — банк, игра, рабочий портал.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                            <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}"
+                                    Margin="4" Click="UserList_Click"
+                                    local:Hint.Text="ipset-exclude-user.txt — IP-адреса и подсети, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: опытным пользователям — когда ломается то, у чего нет доменного имени: игровой сервер, VPN, устройство в домашней сети.&#x0a;&#x0a;Что делать: впишите адреса по одному в строке, например 192.168.0.0/16 или 203.0.113.5.&#x0a;&#x0a;После сохранения выключите и включите обход." />
+                            <Button Content="Папка lists" Style="{StaticResource Pill}"
+                                    Margin="4" Click="ListsFolder_Click"
+                                    local:Hint.Text="Открывает папку со всеми списками zapret.&#x0a;&#x0a;Кому нужно: тем, кто хочет посмотреть, какие сайты и адреса уже входят в обход, или подложить готовый список.&#x0a;&#x0a;Важно: основные файлы (list-general.txt, ipset-all.txt и другие) перезаписываются при обновлении компонентов. Свои правки вносите только в файлы с user в названии — они сохраняются." />
+                        </UniformGrid>
+                    </Grid>
                 </Border>
             </Grid>
 
-            <!-- User lists -->
-            <Border Grid.Row="4" Style="{StaticResource Card}" Margin="24,0,24,8" Padding="16,9,12,9">
-                <Grid>
+            <!-- TG WS Proxy tab: the same places as on the zapret tab - power button, a card in the middle,
+                 three switches and a bar of buttons (ProxyTab.cs). Nothing here has to be filled in: address,
+                 port and key are the proxy's own defaults and live in its config.json. -->
+            <Grid x:Name="ProxyView" Grid.Row="1" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <Grid Width="150" Height="150">
+                        <Ellipse x:Name="PxDisc" Width="124" Height="124">
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#73000000" />
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="3">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#6B6B6B" />
+                            </Ellipse.Stroke>
+                            <Ellipse.Effect>
+                                <DropShadowEffect x:Name="PxGlowFx" Color="#6B6B6B" BlurRadius="40" ShadowDepth="0" Opacity="0" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <Viewbox Width="46" Height="46" IsHitTestVisible="False">
+                            <Canvas Width="24" Height="24">
+                                <Path x:Name="PxIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
+                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                    <Path.Stroke>
+                                        <SolidColorBrush Color="#9A9A9A" />
+                                    </Path.Stroke>
+                                </Path>
+                            </Canvas>
+                        </Viewbox>
+                        <Button x:Name="PxPower" Style="{StaticResource Ghost}" Width="124" Height="124"
+                                Click="PxPower_Click" />
+                    </Grid>
+
+                    <TextBlock x:Name="PxStatus" Text="Отключено" FontSize="24" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                    <TextBlock x:Name="PxSub" Text="Нажмите, чтобы включить прокси для Telegram" FontSize="13" MaxWidth="520"
+                               TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                               HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
+                </StackPanel>
+
+                <!-- What happens after the button is pressed, where the strategy list is on the other tab -->
+                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Margin="12,10,12,8">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Подключение Telegram" FontSize="14" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Делается один раз" FontSize="12"
+                                           HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button x:Name="PxConnect" Content="Подключить" Style="{StaticResource Pill}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="PxConnect_Click"
+                                    local:Hint.Text="Открывает в Telegram на этом компьютере окно с предложением подключить прокси — останется подтвердить.&#x0a;&#x0a;Кому нужно: при первом включении прокси это происходит само. Кнопка — на случай, если окно закрыли или прокси пропал из настроек Telegram.&#x0a;&#x0a;Если Telegram после этого не соединяется, отключите в его настройках прокси «Попытку соединения по IPv6»." />
+                        </Grid>
+
+                        <StackPanel Grid.Row="1" Margin="34,0,34,10" VerticalAlignment="Center">
+                            <Grid Margin="0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="46" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                    <TextBlock Text="1" FontSize="13" Foreground="{StaticResource Text}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Включите прокси" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Кнопкой питания сверху. Он работает прямо на этом компьютере" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="46" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                    <TextBlock Text="2" FontSize="13" Foreground="{StaticResource Text}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Подтвердите в Telegram" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Telegram сам откроется с предложением подключить прокси. Не открылся — нажмите «Подключить»" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="46" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                    <TextBlock Text="3" FontSize="13" Foreground="{StaticResource Text}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Готово" FontSize="14" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="Дальше Telegram ходит через прокси сам, пока тот включён. Точка у названия вкладки показывает, что он работает" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Switches -->
+                <Grid Grid.Row="2" Height="94" Margin="24,0,24,14">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
-                        <TextBlock Text="Свои списки" FontSize="14" Foreground="{StaticResource Text}" />
-                        <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
-                                   Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                    </StackPanel>
-                    <UniformGrid Grid.Column="1" Rows="1">
-                        <Button Content="Мои сайты" Tag="list-general-user.txt" Style="{StaticResource Pill}"
-                                Margin="4" Click="UserList_Click"
-                                local:Hint.Text="list-general-user.txt — сайты, которые нужно разблокировать дополнительно.&#x0a;&#x0a;Кому нужно: если сайт заблокирован и не открывается даже с включённым обходом.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com — без https:// и без пути. Поддомены подхватятся сами. Не оставляйте файл пустым.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                        <Button Content="Исключения" Tag="list-exclude-user.txt" Style="{StaticResource Pill}"
-                                Margin="4" Click="UserList_Click"
-                                local:Hint.Text="list-exclude-user.txt — сайты, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: если с включённым обходом перестал работать обычный сайт или сервис — банк, игра, рабочий портал.&#x0a;&#x0a;Что делать: впишите домены по одному в строке, например example.com.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                        <Button Content="Исключения IP" Tag="ipset-exclude-user.txt" Style="{StaticResource Pill}"
-                                Margin="4" Click="UserList_Click"
-                                local:Hint.Text="ipset-exclude-user.txt — IP-адреса и подсети, которые обход трогать не должен.&#x0a;&#x0a;Кому нужно: опытным пользователям — когда ломается то, у чего нет доменного имени: игровой сервер, VPN, устройство в домашней сети.&#x0a;&#x0a;Что делать: впишите адреса по одному в строке, например 192.168.0.0/16 или 203.0.113.5.&#x0a;&#x0a;После сохранения выключите и включите обход." />
-                        <Button Content="Папка lists" Style="{StaticResource Pill}"
-                                Margin="4" Click="ListsFolder_Click"
-                                local:Hint.Text="Открывает папку со всеми списками zapret.&#x0a;&#x0a;Кому нужно: тем, кто хочет посмотреть, какие сайты и адреса уже входят в обход, или подложить готовый список.&#x0a;&#x0a;Важно: основные файлы (list-general.txt, ipset-all.txt и другие) перезаписываются при обновлении компонентов. Свои правки вносите только в файлы с user в названии — они сохраняются." />
-                    </UniformGrid>
+
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="PxCf" Style="{StaticResource Switch}" Click="PxSwitch_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Резерв через Cloudflare" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Если прямой путь к Telegram закрыт" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="PxH2" Style="{StaticResource Switch}" Click="PxSwitch_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Ускорение медиа" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Фото и видео по HTTP/2 через Cloudflare" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="16,0">
+                        <CheckBox x:Name="PxAuto" Style="{StaticResource Switch}" Click="PxAuto_Click" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="Включать с лаунчером" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Прокси стартует сам при запуске" FontSize="12"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
                 </Grid>
-            </Border>
+
+                <!-- Actions -->
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="24,0,24,8" Padding="16,9,12,9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,24,0">
+                            <TextBlock Text="Действия" FontSize="14" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Наведите на кнопку, чтобы узнать, зачем она" FontSize="12"
+                                       Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <UniformGrid Grid.Column="1" Rows="1">
+                            <Button Content="Скопировать ссылку" Style="{StaticResource Pill}"
+                                    Margin="4" Click="PxCopy_Click"
+                                    local:Hint.Text="Копирует ссылку вида tg://proxy… с адресом, портом и ключом этого прокси.&#x0a;&#x0a;Кому нужно: если кнопка «Подключить» не открыла Telegram.&#x0a;&#x0a;Что делать: отправьте ссылку себе в «Избранное» в Telegram и нажмите на неё." />
+                            <Button x:Name="PxMedia" Content="Не грузятся медиа" Style="{StaticResource Pill}"
+                                    Margin="4" Click="PxMedia_Click"
+                                    local:Hint.Text="Переключает способ, которым прокси соединяется с серверами Telegram (таблицу DC → IP), и перезапускает его.&#x0a;&#x0a;Кому нужно: если сообщения через прокси ходят, а фото и видео не загружаются.&#x0a;&#x0a;Способов три, каждое нажатие включает следующий по кругу. Нажали — проверьте Telegram; не помогло — нажмите ещё раз." />
+                            <Button Content="Логи" Style="{StaticResource Pill}"
+                                    Margin="4" Click="PxLogs_Click"
+                                    local:Hint.Text="Открывает журнал прокси в Блокноте.&#x0a;&#x0a;Кому нужно: если Telegram не соединяется — причина обычно написана в последних строках. Журнал начинается заново при каждом запуске прокси." />
+                            <Button Content="Папка" Style="{StaticResource Pill}"
+                                    Margin="4" Click="PxFolder_Click"
+                                    local:Hint.Text="Открывает папку, где лежат TG WS Proxy и его настройки.&#x0a;&#x0a;Кому нужно: тем, кто хочет поправить файл TgWsProxy_data\config.json вручную — в нём адрес, порт, ключ и остальные настройки прокси, которых нет на этой вкладке." />
+                        </UniformGrid>
+                    </Grid>
+                </Border>
+            </Grid>
 
             <!-- Footer: the version line pulls out a tray of actions; messages fade in under it (see Log) -->
-            <StackPanel Grid.Row="5" Margin="24,0,24,8">
+            <StackPanel Grid.Row="2" Margin="24,0,24,8">
                 <ProgressBar x:Name="DownloadBar" Height="3" Visibility="Collapsed" Minimum="0" Maximum="100"
                              Background="#24FFFFFF" Foreground="{StaticResource Signal}" BorderThickness="0"
                              Margin="0,6,0,0" />
@@ -615,7 +853,7 @@
                     <StackPanel x:Name="PageWelcome">
                         <TextBlock Text="Установка Zapret Launcher" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,14,0,0"
-                                   Text="Мастер установит лаунчер, создаст ярлыки и сразу скачает компоненты zapret. После этого обход блокировок включается одной кнопкой." />
+                                   Text="Мастер установит лаунчер, создаст ярлыки и сразу скачает компоненты zapret и прокси для Telegram. После этого обход блокировок включается одной кнопкой." />
                         <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,0"
                                    Text="Удалить программу потом можно через «Установка и удаление программ» в параметрах Windows." />
                         <TextBlock x:Name="SetupVersion" FontSize="12" Foreground="{StaticResource Faint}" Margin="0,22,0,0" />
@@ -669,12 +907,12 @@
                     <StackPanel x:Name="PageRemove" Visibility="Collapsed">
                         <TextBlock Text="Удалить Zapret Launcher?" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock FontSize="14" LineHeight="22" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,14,0,0"
-                                   Text="Будут удалены лаунчер, ярлыки, автозапуск и скачанные компоненты zapret. Если обход сейчас включён, он остановится." />
+                                   Text="Будут удалены лаунчер, ярлыки, автозапуск и скачанные компоненты: zapret и прокси для Telegram. Если обход или прокси сейчас включены, они остановятся." />
                         <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Margin="0,20,0,0" />
                         <CheckBox x:Name="SetupKeep" Style="{StaticResource Switch}" IsChecked="True" Margin="0,16,0,0">
                             <StackPanel>
                                 <TextBlock Text="Сохранить мои настройки" FontSize="14" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Выбранная стратегия, переключатели и ваши списки *user*.txt — на случай повторной установки"
+                                <TextBlock Text="Стратегия, переключатели, списки *user*.txt и настройки прокси — на случай повторной установки"
                                            FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                             </StackPanel>
                         </CheckBox>

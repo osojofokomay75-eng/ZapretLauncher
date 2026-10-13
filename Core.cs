@@ -35,6 +35,9 @@ namespace ZapretLauncher
         public bool GameFilter;
         public bool Autostart;
         public bool CloseToTray = true;
+        public bool ProxyAuto;              // start TG WS Proxy together with the launcher
+        public string Tab = "zapret";       // the tab that was open last
+        public string ProxyLinked = "";     // the proxy address and key Telegram has already been offered
 
         public static Settings Load()
         {
@@ -53,6 +56,9 @@ namespace ZapretLauncher
                         case "gamefilter": s.GameFilter = v == "1"; break;
                         case "autostart": s.Autostart = v == "1"; break;
                         case "closetotray": s.CloseToTray = v == "1"; break;
+                        case "proxyauto": s.ProxyAuto = v == "1"; break;
+                        case "tab": s.Tab = v; break;
+                        case "proxylinked": s.ProxyLinked = v; break;
                     }
                 }
             }
@@ -71,6 +77,9 @@ namespace ZapretLauncher
                     "gamefilter=" + (GameFilter ? "1" : "0"),
                     "autostart=" + (Autostart ? "1" : "0"),
                     "closetotray=" + (CloseToTray ? "1" : "0"),
+                    "proxyauto=" + (ProxyAuto ? "1" : "0"),
+                    "tab=" + Tab,
+                    "proxylinked=" + ProxyLinked,
                 });
             }
             catch { }

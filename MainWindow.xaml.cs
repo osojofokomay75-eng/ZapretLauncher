@@ -478,6 +478,7 @@ namespace ZapretLauncher
             GameToggle.IsChecked = _s.GameFilter;
             AutostartToggle.IsChecked = _s.Autostart;
             CloseToggle.IsChecked = _s.CloseToTray;
+            InitProxy();
             RefreshVersion();
 
             try
@@ -493,6 +494,12 @@ namespace ZapretLauncher
                     SetState(UiState.Missing);
                     if (!_autostartLaunch) await InstallAsync(false);
                 }
+            }
+            catch (Exception ex) { Log("Ошибка: " + ex.Message); }
+
+            try
+            {
+                if (_s.ProxyAuto && TgProxy.IsInstalled) await ProxyStartAsync(false);
             }
             catch (Exception ex) { Log("Ошибка: " + ex.Message); }
         }
@@ -515,9 +522,12 @@ namespace ZapretLauncher
         {
             var menu = new TrayMenu();
             menu.Add("Открыть", true, ShowFromTray);
-            menu.Add(_state == UiState.Running ? "Выключить" : "Включить",
+            menu.Add(_state == UiState.Running ? "Zapret: выключить" : "Zapret: включить",
                 _state == UiState.Idle || _state == UiState.Running || _state == UiState.Missing,
                 () => Power_Click(null, null));
+            menu.Add(_pxState == ProxyState.Running ? "Прокси Telegram: выключить" : "Прокси Telegram: включить",
+                _pxState == ProxyState.Idle || _pxState == ProxyState.Running,
+                () => PxPower_Click(null, null));
             menu.AddSeparator();
             menu.Add("Выход", true, ExitApp);
             menu.Popup();
@@ -579,25 +589,41 @@ namespace ZapretLauncher
             UpdateButton.IsEnabled = !locked;
             PowerButton.IsEnabled = st != UiState.Installing && st != UiState.Starting;
 
-            // the tray icon shows on / off; the window keeps the application icon (app.ico)
-            var icon = IconFactory.Tray(st == UiState.Running);
+            SetDot(TabZapret, st == UiState.Running);
+            UpdateTray();
+        }
+
+        // One tray icon for the bypass and the Telegram proxy: lit while either is running, with both named
+        // in the tooltip. The window keeps the application icon (app.ico).
+        void UpdateTray()
+        {
+            bool zapret = _state == UiState.Running, proxy = _pxState == ProxyState.Running;
+            var icon = IconFactory.Tray(zapret || proxy);
             var old = _tray.Icon;
             _tray.Icon = icon;
             if (old != null) old.Dispose();
-            _tray.Text = ("Zapret Launcher — " + title).Substring(0, Math.Min(63, ("Zapret Launcher — " + title).Length));
+            // a tray tooltip holds 63 characters
+            _tray.Text = "Zapret: " + (zapret ? "включён" : "выключен") + " · Прокси Telegram: " + (proxy ? "включён" : "выключен");
         }
 
         void Tint(Color color, Color disc, double glow, bool pulse)
         {
+            Tint(Ring, PowerIcon, Disc, GlowFx, color, disc, glow, pulse);
+        }
+
+        // colours a power button: ring and glyph, the disc under them, and the glow (steady or pulsing)
+        static void Tint(System.Windows.Shapes.Shape ring, System.Windows.Shapes.Shape glyph, System.Windows.Shapes.Shape discShape,
+            DropShadowEffect fx, Color color, Color disc, double glow, bool pulse)
+        {
             var d = TimeSpan.FromMilliseconds(300);
-            ((SolidColorBrush)Ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
-            ((SolidColorBrush)PowerIcon.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
-            ((SolidColorBrush)Disc.Fill).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(disc, d));
-            GlowFx.BeginAnimation(DropShadowEffect.ColorProperty, new ColorAnimation(color, d));
+            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
+            ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(color, d));
+            ((SolidColorBrush)discShape.Fill).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(disc, d));
+            fx.BeginAnimation(DropShadowEffect.ColorProperty, new ColorAnimation(color, d));
 
             if (pulse)
             {
-                GlowFx.BeginAnimation(DropShadowEffect.OpacityProperty,
+                fx.BeginAnimation(DropShadowEffect.OpacityProperty,
                     new DoubleAnimation(0.15, 0.8, TimeSpan.FromMilliseconds(750))
                     {
                         AutoReverse = true,
@@ -606,7 +632,7 @@ namespace ZapretLauncher
             }
             else
             {
-                GlowFx.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(glow, d));
+                fx.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(glow, d));
             }
         }
 
@@ -651,7 +677,10 @@ namespace ZapretLauncher
 
         void RefreshVersion()
         {
-            VersionText.Text = "Компоненты zapret: " + (Engine.InstalledVersion ?? "не установлены");
+            // the footer belongs to whichever tab is open
+            VersionText.Text = _proxyTab
+                ? "TG WS Proxy: " + (TgProxy.InstalledVersion ?? (TgProxy.IsInstalled ? "установлен" : "не установлен"))
+                : "Компоненты zapret: " + (Engine.InstalledVersion ?? "не установлены");
         }
 
         void ReloadStrategies()
@@ -858,7 +887,11 @@ namespace ZapretLauncher
 
         async void Update_Click(object sender, RoutedEventArgs e)
         {
-            try { await InstallAsync(true); }
+            try
+            {
+                if (_proxyTab) await ProxyInstallAsync(true);
+                else await InstallAsync(true);
+            }
             catch (Exception ex) { Log("Ошибка: " + ex.Message); }
         }
 
@@ -979,12 +1012,19 @@ namespace ZapretLauncher
         {
             try
             {
+                if (_proxyTab)
+                {
+                    ProxyFolder();
+                    return;
+                }
                 string dir = Engine.FindRoot() ?? Paths.Root;
                 System.IO.Directory.CreateDirectory(dir);
                 Process.Start("explorer.exe", "\"" + dir + "\"");
             }
             catch (Exception ex) { Log(ex.Message); }
         }
+
+        void PxFolder_Click(object sender, RoutedEventArgs e) { Folder_Click(sender, e); }
 
         void UserList_Click(object sender, RoutedEventArgs e)
         {
@@ -1045,6 +1085,7 @@ namespace ZapretLauncher
             if (_setup != SetupMode.None) { SetupCleanup(); return; }   // the wizard must not stop a running bypass
             try { _tray.Visible = false; _tray.Dispose(); } catch { }
             _runner.Stop();
+            _proxy.Stop();
         }
 
         void ExitApp()
