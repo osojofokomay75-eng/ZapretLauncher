@@ -214,7 +214,7 @@
             </Setter>
         </Style>
 
-        <!-- Strategy rows: selected row gets a signal bar on the left -->
+        <!-- Strategy rows: the selected row gets a signal bar on the left; rows the auto-pick found working get a tick -->
         <Style TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
             <Setter Property="Cursor" Value="Hand" />
@@ -227,9 +227,18 @@
                                 <Border x:Name="Bar" Width="3" Height="16" CornerRadius="2" HorizontalAlignment="Left"
                                         Margin="-16,0,0,0" Background="{StaticResource Signal}" Visibility="Hidden" />
                                 <ContentPresenter HorizontalAlignment="Center" TextElement.FontSize="13.5" />
+                                <TextBlock x:Name="Tick" Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                           Foreground="{StaticResource Text}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Margin="0,0,-4,0" Visibility="Collapsed" />
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <!-- first, so that hover and selection still win over it -->
+                            <DataTrigger Binding="{Binding Works}" Value="True">
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Bd" Property="Background" Value="#0DFFFFFF" />
+                                <Setter Property="Foreground" Value="{StaticResource Text}" />
+                            </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#12FFFFFF" />
                                 <Setter Property="Foreground" Value="{StaticResource Text}" />

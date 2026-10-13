@@ -115,10 +115,28 @@ namespace ZapretLauncher
     }
 
     // -------------------------------------------------------------- engine
-    public sealed class Strategy
+    public sealed class Strategy : System.ComponentModel.INotifyPropertyChanged
     {
+        bool _works;
+
         public string Name { get; set; }
         public string BatPath { get; set; }
+
+        /// <summary>Set by the auto-pick on every strategy that got the test sites through; the list marks such rows.</summary>
+        public bool Works
+        {
+            get { return _works; }
+            set
+            {
+                if (_works == value) return;
+                _works = value;
+                var h = PropertyChanged;
+                if (h != null) h(this, new System.ComponentModel.PropertyChangedEventArgs("Works"));
+            }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
         public override string ToString() { return Name; }
     }
 
