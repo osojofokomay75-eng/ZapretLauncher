@@ -94,6 +94,7 @@ namespace ZapretLauncher
                 try { p.Kill(); p.WaitForExit(3000); } catch { }
             }
             new Runner().Stop();
+            new ProxyRunner().Stop();
         }
 
         /// <summary>Copies the launcher, creates the shortcuts and registers the uninstaller. Returns the installed exe.</summary>
@@ -124,8 +125,8 @@ namespace ZapretLauncher
         }
 
         /// <summary>
-        /// Removes everything Install created. With keepSettings the choices the user made
-        /// (settings.ini and their own *user*.txt lists) stay for a later re-install.
+        /// Removes everything Install created. With keepSettings the choices the user made (settings.ini,
+        /// their own *user*.txt lists and the Telegram proxy's config) stay for a later re-install.
         /// </summary>
         public static void Uninstall(string dir, bool keepSettings)
         {
@@ -162,7 +163,8 @@ namespace ZapretLauncher
                 bool userList = string.Equals(Path.GetDirectoryName(file), lists, StringComparison.OrdinalIgnoreCase)
                     && Path.GetFileName(file).IndexOf("user", StringComparison.OrdinalIgnoreCase) >= 0
                     && file.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
-                if (!settings && !userList) TryDelete(file);
+                bool proxyConfig = string.Equals(file, TgProxy.ConfigFile, StringComparison.OrdinalIgnoreCase);
+                if (!settings && !userList && !proxyConfig) TryDelete(file);
             }
             // deepest folders first, and only the ones left empty
             foreach (var sub in Directory.GetDirectories(Paths.Root, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
@@ -343,6 +345,24 @@ namespace ZapretLauncher
                     catch (Exception ex)
                     {
                         note += "\n\nКомпоненты zapret скачать не удалось: " + ex.Message + ". Лаунчер скачает их при первом запуске.";
+                    }
+                }
+
+                if (!TgProxy.IsInstalled)
+                {
+                    try
+                    {
+                        SetupBar.IsIndeterminate = true;
+                        SetupStatus.Text = "Проверяю последнюю версию TG WS Proxy на GitHub";
+                        var proxy = await TgProxy.GetLatestAsync();
+                        SetupStatus.Text = "Скачиваю прокси для Telegram (TG WS Proxy " + proxy.Tag + ")";
+                        SetupBar.Value = 0;
+                        SetupBar.IsIndeterminate = false;
+                        await TgProxy.InstallAsync(proxy, new Progress<double>(p => SetupBar.Value = p * 100));
+                    }
+                    catch (Exception ex)
+                    {
+                        note += "\n\nПрокси для Telegram скачать не удалось: " + ex.Message + ". Его можно скачать на вкладке TG WS Proxy.";
                     }
                 }
 
