@@ -758,13 +758,14 @@ namespace ZapretLauncher
         static void Tint(System.Windows.Shapes.Shape ring, System.Windows.Shapes.Shape glyph,
             FrameworkElement haloIn, FrameworkElement haloOut, Color color, double glow, bool pulse, bool on)
         {
-            var d = TimeSpan.FromMilliseconds(400);
+            var d = TimeSpan.FromMilliseconds(700);   // unhurried: a press should not look like a flick of a switch
+            var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
             Color edge = on ? color : pulse ? Hex("#AAAAAA") : Hex(glow > 0 ? "#66FFFFFF" : "#33FFFFFF");
-            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d));
+            ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d) { EasingFunction = ease });
             // half the old widths: the button is drawn enlarged, and its lines with it
             ring.BeginAnimation(System.Windows.Shapes.Shape.StrokeThicknessProperty, new DoubleAnimation(on ? 1 : 0.5, d));
             Color tint = Hex(on ? "#A6FFFFFF" : pulse ? "#73FFFFFF" : glow > 0 ? "#5CFFFFFF" : "#47FFFFFF");
-            ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(tint, d));
+            ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(tint, d) { EasingFunction = ease });
 
             if (on)
             {
@@ -783,6 +784,19 @@ namespace ZapretLauncher
             }
         }
 
+        // The glyph sinks a little while the button is held and comes back up, slowly, when it is let go.
+        void Power_Down(object sender, MouseButtonEventArgs e) { PressGlyph(sender, 0.86, 220, new SineEase { EasingMode = EasingMode.EaseOut }); }
+
+        void Power_Up(object sender, MouseEventArgs e) { PressGlyph(sender, 1, 520, new CubicEase { EasingMode = EasingMode.EaseOut }); }
+
+        void PressGlyph(object button, double to, int ms, IEasingFunction ease)
+        {
+            var glyph = ReferenceEquals(button, PxPower) ? PxGlyph : PowerGlyph;
+            var move = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease };
+            glyph.BeginAnimation(ScaleTransform.ScaleXProperty, move);
+            glyph.BeginAnimation(ScaleTransform.ScaleYProperty, move);
+        }
+
         // Fades a halo to "from" and, if a period is given, keeps it swinging between "from" and "to" while
         // swelling it to "grow". The swing only starts once the fade is done, and not at all if the button
         // has been repainted in the meantime.
@@ -792,7 +806,7 @@ namespace ZapretLauncher
             var token = new object();
             halo.Tag = token;
 
-            var settle = TimeSpan.FromMilliseconds(400);
+            var settle = TimeSpan.FromMilliseconds(700);
             scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(1, settle));
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, settle));
             var fade = new DoubleAnimation(from, settle);
