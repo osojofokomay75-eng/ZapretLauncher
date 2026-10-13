@@ -30,7 +30,15 @@ namespace ZapretLauncher
 
         public static string SelfPath { get { return Process.GetCurrentProcess().MainModule.FileName; } }
 
-        public static string Version { get { return typeof(Installer).Assembly.GetName().Version.ToString(3); } }
+        public static string Version
+        {
+            get
+            {
+                // three numbers, or four for a patch such as 1.3.0.1
+                var v = typeof(Installer).Assembly.GetName().Version;
+                return v.ToString(v.Revision > 0 ? 4 : 3);
+            }
+        }
 
         // --------------------------------------------- a newer installer
         const string Releases = "https://github.com/pikacu1337/ZapretLauncher/releases";
@@ -79,8 +87,8 @@ namespace ZapretLauncher
 
             var ours = typeof(Installer).Assembly.GetName().Version;
             // "1.2" and "1.2.0" are the same release
-            return new System.Version(theirs.Major, theirs.Minor, Math.Max(theirs.Build, 0))
-                 > new System.Version(ours.Major, ours.Minor, Math.Max(ours.Build, 0));
+            return new System.Version(theirs.Major, theirs.Minor, Math.Max(theirs.Build, 0), Math.Max(theirs.Revision, 0))
+                 > new System.Version(ours.Major, ours.Minor, Math.Max(ours.Build, 0), Math.Max(ours.Revision, 0));
         }
 
         /// <summary>Downloads that release's installer into %TEMP% and returns where it is.</summary>

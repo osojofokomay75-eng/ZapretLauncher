@@ -521,10 +521,6 @@
             <!-- Title bar -->
             <Grid x:Name="TitleBar" Grid.Row="0" Height="44" Background="Transparent"
                   MouseLeftButtonDown="TitleBar_MouseDown">
-                <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="Zapret" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                    <TextBlock Text=" Launcher" FontSize="15" Foreground="{StaticResource Faint}" />
-                </StackPanel>
                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel x:Name="TabStrip" Orientation="Horizontal">
                         <RadioButton x:Name="TabZapret" Content="Zapret" Style="{StaticResource Tab}" IsChecked="True" Checked="Tab_Checked" />
@@ -635,7 +631,7 @@
                     <Button x:Name="StrategiesButton" Style="{StaticResource Pill}" Padding="16,8" Margin="0,18,0,0" HorizontalAlignment="Center"
                             Click="Strategies_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,1,9,0" />
+                            <TextBlock Text="&#x1F4DC;" FontFamily="Segoe UI Emoji" FontSize="15" VerticalAlignment="Center" Margin="0,0,8,1" />
                             <TextBlock Text="Список стратегий" FontSize="13.5" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
