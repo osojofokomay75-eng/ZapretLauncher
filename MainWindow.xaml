@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ZapretLauncher"
-        Title="Zapret Launcher" Width="1152" Height="826" MinWidth="1060" MinHeight="680"
+        Title="Zapret Launcher" Width="1152" Height="826" MinWidth="1060" MinHeight="720"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResize"
         Background="#050505" UseLayoutRounding="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
@@ -481,10 +481,14 @@
     <Grid x:Name="Shell">
         <Rectangle Fill="{StaticResource Space}" />
 
-        <!-- The user's own picture, if one is chosen in Settings: it fills the window, dimmed so the text stays readable -->
+        <!-- The picture behind everything - the launcher's own or the user's (Settings) - dimmed and, if asked,
+             blurred. It is wider than the window and tiled as mirror images, so a blur has picture to take in
+             at the edges instead of fading out there. -->
         <Grid x:Name="Wallpaper" Visibility="Collapsed" IsHitTestVisible="False">
-            <Rectangle x:Name="WallpaperBox" />
-            <Rectangle Fill="#85000000" />
+            <Grid x:Name="WallpaperHost" Margin="-130">
+                <Rectangle x:Name="WallpaperBox" />
+            </Grid>
+            <Rectangle x:Name="WallpaperDim" />
         </Grid>
 
         <!-- Drifting stars; the layers are filled in code -->
@@ -499,11 +503,10 @@
                 <Grid x:Name="FrostSky" />
             </Grid>
             <Grid x:Name="FrostWallpaper" Visibility="Collapsed">
-                <!-- wider than the window and tiled as mirror images, so the blur has picture to take in at the edges -->
                 <Grid x:Name="FrostWallpaperHost" Margin="-130">
                     <Rectangle x:Name="FrostWallpaperBox" />
                 </Grid>
-                <Rectangle Fill="#A6000000" />
+                <Rectangle x:Name="FrostWallpaperDim" />
             </Grid>
             <Rectangle Fill="{StaticResource Veil}" />
         </Grid>
@@ -530,13 +533,9 @@
                     </StackPanel>
                     <!-- The underline of the open tab; code slides it under the tab that is chosen -->
                     <Border x:Name="TabBar" Width="18" Height="3" CornerRadius="2" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                            Margin="0,0,0,4" Background="{DynamicResource Signal}" IsHitTestVisible="False" Opacity="0"
-                            RenderTransformOrigin="0.5,0.5">
+                            Margin="0,0,0,4" Background="{DynamicResource Signal}" IsHitTestVisible="False" Opacity="0">
                         <Border.RenderTransform>
-                            <TransformGroup>
-                                <ScaleTransform x:Name="TabBarStretch" />
-                                <TranslateTransform x:Name="TabBarAt" />
-                            </TransformGroup>
+                            <TranslateTransform x:Name="TabBarAt" />
                         </Border.RenderTransform>
                     </Border>
                 </Grid>
@@ -547,272 +546,196 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Zapret tab: the power button and the strategies; everything to tune is on the Settings tab -->
+            <!-- Zapret tab: a large power button in the middle; the strategies open in a window of their own
+                 (ModalLayer), everything to tune is on the Settings tab -->
             <Grid x:Name="ZapretView" Grid.Row="1">
+                <!-- the button sits in the very middle; what goes with it hangs below -->
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Power disc and status -->
-                <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
-                    <Grid Width="150" Height="150">
-                        <!-- A disc of the same frosted glass as the panels, with a corona of the accent colour around it.
-                             The corona is two blurred discs, a tight bright one and a wide faint one; each is drawn
-                             once into a bitmap, and code only fades and swells those (see Tint). The glyph is a
-                             lighter, see-through tint of the glass and does not take the accent. -->
-                        <Canvas IsHitTestVisible="False">
-                            <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
-                            <Canvas.Clip>
-                                <CombinedGeometry GeometryCombineMode="Exclude">
-                                    <CombinedGeometry.Geometry1>
-                                        <RectangleGeometry Rect="-110,-110,370,370" />
-                                    </CombinedGeometry.Geometry1>
-                                    <CombinedGeometry.Geometry2>
-                                        <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
-                                    </CombinedGeometry.Geometry2>
-                                </CombinedGeometry>
-                            </Canvas.Clip>
-                            <Grid x:Name="HaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Grid.CacheMode>
-                                    <BitmapCache RenderAtScale="0.5" />
-                                </Grid.CacheMode>
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
-                                <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
-                                    <Ellipse.Effect>
-                                        <BlurEffect Radius="80" RenderingBias="Performance" />
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                            </Grid>
-                            <Grid x:Name="HaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Grid.CacheMode>
-                                    <BitmapCache RenderAtScale="0.5" />
-                                </Grid.CacheMode>
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
-                                <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
-                                    <Ellipse.Effect>
-                                        <BlurEffect Radius="36" RenderingBias="Performance" />
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                            </Grid>
+                <Grid Grid.Row="1" Width="150" Height="150" HorizontalAlignment="Center">
+                    <!-- drawn at its old size and enlarged whole, corona and all -->
+                    <Grid.LayoutTransform>
+                        <ScaleTransform ScaleX="2.3" ScaleY="2.3" />
+                    </Grid.LayoutTransform>
+                    <!-- A disc of the same frosted glass as the panels, with a corona of the accent colour around it.
+                         The corona is two blurred discs, a tight bright one and a wide faint one; each is drawn
+                         once into a bitmap, and code only fades and swells those (see Tint). The glyph is a
+                         lighter, see-through tint of the glass and does not take the accent. -->
+                    <Canvas IsHitTestVisible="False">
+                        <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
+                        <Canvas.Clip>
+                            <CombinedGeometry GeometryCombineMode="Exclude">
+                                <CombinedGeometry.Geometry1>
+                                    <RectangleGeometry Rect="-110,-110,370,370" />
+                                </CombinedGeometry.Geometry1>
+                                <CombinedGeometry.Geometry2>
+                                    <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
+                                </CombinedGeometry.Geometry2>
+                            </CombinedGeometry>
+                        </Canvas.Clip>
+                        <Grid x:Name="HaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.CacheMode>
+                                <BitmapCache RenderAtScale="0.5" />
+                            </Grid.CacheMode>
+                            <Grid.RenderTransform>
+                                <ScaleTransform />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="80" RenderingBias="Performance" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Grid>
+                        <Grid x:Name="HaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.CacheMode>
+                                <BitmapCache RenderAtScale="0.5" />
+                            </Grid.CacheMode>
+                            <Grid.RenderTransform>
+                                <ScaleTransform />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="36" RenderingBias="Performance" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Grid>
+                    </Canvas>
+                    <Ellipse x:Name="Disc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="999" />
+                    <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="1">
+                        <Ellipse.Stroke>
+                            <SolidColorBrush Color="#33FFFFFF" />
+                        </Ellipse.Stroke>
+                    </Ellipse>
+                    <Viewbox Width="46" Height="46" IsHitTestVisible="False">
+                        <Canvas Width="24" Height="24">
+                            <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
+                                  StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                <Path.Stroke>
+                                    <SolidColorBrush Color="#47FFFFFF" />
+                                </Path.Stroke>
+                            </Path>
                         </Canvas>
-                        <Ellipse x:Name="Disc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="62" />
-                        <Ellipse x:Name="Ring" Width="124" Height="124" StrokeThickness="1">
-                            <Ellipse.Stroke>
-                                <SolidColorBrush Color="#33FFFFFF" />
-                            </Ellipse.Stroke>
-                        </Ellipse>
-                        <Viewbox Width="46" Height="46" IsHitTestVisible="False">
-                            <Canvas Width="24" Height="24">
-                                <Path x:Name="PowerIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
-                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
-                                    <Path.Stroke>
-                                        <SolidColorBrush Color="#47FFFFFF" />
-                                    </Path.Stroke>
-                                </Path>
-                            </Canvas>
-                        </Viewbox>
-                        <Button x:Name="PowerButton" Style="{StaticResource Ghost}" Width="124" Height="124"
-                                Click="Power_Click" />
-                    </Grid>
+                    </Viewbox>
+                    <Button x:Name="PowerButton" Style="{StaticResource Ghost}" Width="124" Height="124"
+                            Click="Power_Click" />
+                </Grid>
 
-                    <TextBlock x:Name="StatusText" Text="Отключено" FontSize="24" FontWeight="SemiBold"
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <TextBlock x:Name="StatusText" Text="Отключено" FontSize="28" FontWeight="SemiBold"
                                HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
                     <TextBlock x:Name="SubText" Text="Нажмите, чтобы включить" FontSize="13" MaxWidth="520"
                                TextAlignment="Center" TextTrimming="CharacterEllipsis"
                                HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
+                    <Button x:Name="StrategiesButton" Style="{StaticResource Pill}" Padding="16,8" Margin="0,18,0,0" HorizontalAlignment="Center"
+                            Click="Strategies_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,1,9,0" />
+                            <TextBlock Text="Список стратегий" FontSize="13.5" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding SelectedItem.Name, ElementName=StrategyList}" FontSize="12" MaxWidth="420"
+                               TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" Margin="0,8,0,0"
+                               Foreground="{StaticResource Faint}" />
                 </StackPanel>
-
-                <!-- Strategy list -->
-                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" Margin="0,0,0,8">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <Grid Margin="12,10,12,8">
-                            <StackPanel HorizontalAlignment="Center">
-                                <TextBlock Text="Стратегия обхода" FontSize="14" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Если сайты не открываются, выберите другую" FontSize="12"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <Button x:Name="AutoButton" Content="Автоподбор" Style="{StaticResource Pill}"
-                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="Auto_Click" />
-                        </Grid>
-
-                        <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.CanContentScroll="False" Padding="0"
-                                 TextOptions.TextHintingMode="Fixed"
-                                 PreviewMouseWheel="StrategyList_Wheel"
-                                 SelectionChanged="Strategy_Changed" />
-                    </Grid>
-                </Border>
             </Grid>
 
-            <!-- TG WS Proxy tab: laid out like the zapret tab - power button, a card under it (ProxyTab.cs).
-                 Nothing has to be filled in: address, port and key are the proxy's own defaults and live in its
-                 config.json; its switches are on the Settings tab. -->
+            <!-- TG WS Proxy tab: laid out like the zapret tab (ProxyTab.cs). How to connect Telegram is told in a
+                 window of its own (ModalLayer). Nothing has to be filled in: address, port and key are the proxy's
+                 own defaults and live in its config.json; its switches are on the Settings tab. -->
             <Grid x:Name="ProxyView" Grid.Row="1" Visibility="Collapsed">
+                <!-- the button sits in the very middle; what goes with it hangs below -->
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
-                    <Grid Width="150" Height="150">
-                        <Canvas IsHitTestVisible="False">
-                            <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
-                            <Canvas.Clip>
-                                <CombinedGeometry GeometryCombineMode="Exclude">
-                                    <CombinedGeometry.Geometry1>
-                                        <RectangleGeometry Rect="-110,-110,370,370" />
-                                    </CombinedGeometry.Geometry1>
-                                    <CombinedGeometry.Geometry2>
-                                        <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
-                                    </CombinedGeometry.Geometry2>
-                                </CombinedGeometry>
-                            </Canvas.Clip>
-                            <Grid x:Name="PxHaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Grid.CacheMode>
-                                    <BitmapCache RenderAtScale="0.5" />
-                                </Grid.CacheMode>
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
-                                <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
-                                    <Ellipse.Effect>
-                                        <BlurEffect Radius="80" RenderingBias="Performance" />
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                            </Grid>
-                            <Grid x:Name="PxHaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
-                                  RenderTransformOrigin="0.5,0.5">
-                                <Grid.CacheMode>
-                                    <BitmapCache RenderAtScale="0.5" />
-                                </Grid.CacheMode>
-                                <Grid.RenderTransform>
-                                    <ScaleTransform />
-                                </Grid.RenderTransform>
-                                <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
-                                    <Ellipse.Effect>
-                                        <BlurEffect Radius="36" RenderingBias="Performance" />
-                                    </Ellipse.Effect>
-                                </Ellipse>
-                            </Grid>
+                <Grid Grid.Row="1" Width="150" Height="150" HorizontalAlignment="Center">
+                    <!-- drawn at its old size and enlarged whole, corona and all -->
+                    <Grid.LayoutTransform>
+                        <ScaleTransform ScaleX="2.3" ScaleY="2.3" />
+                    </Grid.LayoutTransform>
+                    <Canvas IsHitTestVisible="False">
+                        <!-- the corona is only seen around the disc: the disc itself is glass, not a lid -->
+                        <Canvas.Clip>
+                            <CombinedGeometry GeometryCombineMode="Exclude">
+                                <CombinedGeometry.Geometry1>
+                                    <RectangleGeometry Rect="-110,-110,370,370" />
+                                </CombinedGeometry.Geometry1>
+                                <CombinedGeometry.Geometry2>
+                                    <EllipseGeometry Center="75,75" RadiusX="61.5" RadiusY="61.5" />
+                                </CombinedGeometry.Geometry2>
+                            </CombinedGeometry>
+                        </Canvas.Clip>
+                        <Grid x:Name="PxHaloOut" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.CacheMode>
+                                <BitmapCache RenderAtScale="0.5" />
+                            </Grid.CacheMode>
+                            <Grid.RenderTransform>
+                                <ScaleTransform />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="152" Height="152" Fill="{DynamicResource Signal}">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="80" RenderingBias="Performance" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Grid>
+                        <Grid x:Name="PxHaloIn" Width="340" Height="340" Canvas.Left="-95" Canvas.Top="-95" Opacity="0"
+                              RenderTransformOrigin="0.5,0.5">
+                            <Grid.CacheMode>
+                                <BitmapCache RenderAtScale="0.5" />
+                            </Grid.CacheMode>
+                            <Grid.RenderTransform>
+                                <ScaleTransform />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="136" Height="136" Fill="{DynamicResource Signal}">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="36" RenderingBias="Performance" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Grid>
+                    </Canvas>
+                    <Ellipse x:Name="PxDisc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="999" />
+                    <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="1">
+                        <Ellipse.Stroke>
+                            <SolidColorBrush Color="#33FFFFFF" />
+                        </Ellipse.Stroke>
+                    </Ellipse>
+                    <Viewbox Width="46" Height="46" IsHitTestVisible="False">
+                        <Canvas Width="24" Height="24">
+                            <Path x:Name="PxIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
+                                  StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                                <Path.Stroke>
+                                    <SolidColorBrush Color="#47FFFFFF" />
+                                </Path.Stroke>
+                            </Path>
                         </Canvas>
-                        <Ellipse x:Name="PxDisc" Width="124" Height="124" Fill="#3D000000" local:Glass.Radius="62" />
-                        <Ellipse x:Name="PxRing" Width="124" Height="124" StrokeThickness="1">
-                            <Ellipse.Stroke>
-                                <SolidColorBrush Color="#33FFFFFF" />
-                            </Ellipse.Stroke>
-                        </Ellipse>
-                        <Viewbox Width="46" Height="46" IsHitTestVisible="False">
-                            <Canvas Width="24" Height="24">
-                                <Path x:Name="PxIcon" Data="M18.36,6.64 A9,9 0 1 1 5.63,6.64 M12,2 L12,12"
-                                      StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
-                                    <Path.Stroke>
-                                        <SolidColorBrush Color="#47FFFFFF" />
-                                    </Path.Stroke>
-                                </Path>
-                            </Canvas>
-                        </Viewbox>
-                        <Button x:Name="PxPower" Style="{StaticResource Ghost}" Width="124" Height="124"
-                                Click="PxPower_Click" />
-                    </Grid>
+                    </Viewbox>
+                    <Button x:Name="PxPower" Style="{StaticResource Ghost}" Width="124" Height="124"
+                            Click="PxPower_Click" />
+                </Grid>
 
-                    <TextBlock x:Name="PxStatus" Text="Отключено" FontSize="24" FontWeight="SemiBold"
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <TextBlock x:Name="PxStatus" Text="Отключено" FontSize="28" FontWeight="SemiBold"
                                HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
                     <TextBlock x:Name="PxSub" Text="Нажмите, чтобы включить прокси для Telegram" FontSize="13" MaxWidth="520"
                                TextAlignment="Center" TextTrimming="CharacterEllipsis"
                                HorizontalAlignment="Center" Margin="0,3,0,0" Foreground="{StaticResource Muted}" />
-                </StackPanel>
-
-                <!-- What happens after the button is pressed, where the strategy list is on the other tab -->
-                <Border Grid.Row="1" Style="{StaticResource Card}" Width="560" HorizontalAlignment="Center" VerticalAlignment="Top"
-                        Margin="0,0,0,8">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <Grid Margin="12,10,12,8">
-                            <Button Content="Ссылка" Style="{StaticResource Pill}"
-                                    HorizontalAlignment="Left" VerticalAlignment="Center" Click="PxCopy_Click"
-                                    local:Hint.Text="Копирует ссылку вида tg://proxy… с адресом, портом и ключом этого прокси.&#x0a;&#x0a;Кому нужно: если кнопка «Подключить» не открыла Telegram.&#x0a;&#x0a;Что делать: отправьте ссылку себе в «Избранное» в Telegram и нажмите на неё." />
-                            <StackPanel HorizontalAlignment="Center">
-                                <TextBlock Text="Подключение Telegram" FontSize="14" FontWeight="SemiBold"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="Делается один раз" FontSize="12"
-                                           HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <Button x:Name="PxConnect" Content="Подключить" Style="{StaticResource Pill}"
-                                    HorizontalAlignment="Right" VerticalAlignment="Center" Click="PxConnect_Click"
-                                    local:Hint.Text="Открывает в Telegram на этом компьютере окно с предложением подключить прокси — останется подтвердить.&#x0a;&#x0a;Кому нужно: при первом включении прокси это происходит само. Кнопка — на случай, если окно закрыли или прокси пропал из настроек Telegram.&#x0a;&#x0a;Если Telegram после этого не соединяется, отключите в его настройках прокси «Попытку соединения по IPv6»." />
-                        </Grid>
-
-                        <StackPanel Grid.Row="1" Margin="34,6,34,16">
-                            <Grid Margin="0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="46" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                                    <TextBlock Text="1" FontSize="13" Foreground="{StaticResource Text}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Включите прокси" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="Кнопкой питания сверху. Он работает прямо на этом компьютере" FontSize="12" LineHeight="17" TextWrapping="Wrap"
-                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="46" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                                    <TextBlock Text="2" FontSize="13" Foreground="{StaticResource Text}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Подтвердите в Telegram" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="Telegram сам откроется с предложением подключить прокси. Не открылся — нажмите «Подключить» или возьмите ссылку" FontSize="12" LineHeight="17" TextWrapping="Wrap"
-                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="46" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                        Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                                    <TextBlock Text="3" FontSize="13" Foreground="{StaticResource Text}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Готово" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="Дальше Telegram ходит через прокси сам, пока тот включён. Точка у названия вкладки показывает, что он работает" FontSize="12" LineHeight="17" TextWrapping="Wrap"
-                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
-                                </StackPanel>
-                            </Grid>
+                    <Button x:Name="ProxyInfoButton" Style="{StaticResource Pill}" Padding="16,8" Margin="0,18,0,0" HorizontalAlignment="Center"
+                            Click="ProxyInfo_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,1,9,0" />
+                            <TextBlock Text="Информация" FontSize="13.5" VerticalAlignment="Center" />
                         </StackPanel>
-                    </Grid>
-                </Border>
+                    </Button>
+                </StackPanel>
             </Grid>
 
             <!-- Settings tab: everything there is to tune - the bypass, the proxy, the program itself and its looks
@@ -925,31 +848,56 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                                     <TextBlock Text="Фон" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock x:Name="BgName" Text="Звёзды" FontSize="12" TextTrimming="CharacterEllipsis"
+                                    <TextBlock x:Name="BgName" Text="Стандартный" FontSize="12" TextTrimming="CharacterEllipsis"
                                                Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Content="Выбрать картинку" Style="{StaticResource Pill}" Click="BgPick_Click"
+                                    <Button Content="Выбрать…" Style="{StaticResource Pill}" Click="BgPick_Click"
                                             local:Hint.Text="Ставит фоном окна вашу картинку: она растягивается на всё окно, лишнее по краям обрезается.&#x0a;&#x0a;Подходят JPG, PNG, BMP, GIF и TIFF. Лаунчер хранит свою копию картинки, исходный файл можно потом удалить или переместить." />
-                                    <Button x:Name="BgReset" Content="Вернуть звёзды" Style="{StaticResource Pill}" Margin="8,0,0,0"
-                                            Click="BgReset_Click" />
+                                    <Button Content="Стандартный" Style="{StaticResource Pill}" Margin="8,0,0,0" Click="BgReset_Click" />
+                                    <Button Content="Звёзды" Style="{StaticResource Pill}" Margin="8,0,0,0" Click="BgStars_Click" />
                                 </StackPanel>
                             </Grid>
-                            <Grid Margin="0,9">
+                            <Grid Margin="0,5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                                    <TextBlock Text="Размытие стекла" FontSize="14" Foreground="{StaticResource Text}" />
-                                    <TextBlock Text="Насколько панели размывают фон под собой" FontSize="12" TextTrimming="CharacterEllipsis"
-                                               Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                                <TextBlock Text="Яркость фона" FontSize="14" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="BrightSlider" Style="{StaticResource Slide}" Width="170" Minimum="0" Maximum="100"
+                                            LargeChange="10" SmallChange="1" Value="50" ValueChanged="Bright_Changed"
+                                            local:Hint.Text="Насколько светлой остаётся картинка на фоне: 100% — как есть, меньше — темнее.&#x0a;&#x0a;На тёмном фоне текст читается лучше. На звёзды не действует." />
+                                    <TextBlock x:Name="BrightValue" Text="50%" Width="40" TextAlignment="Right" FontSize="12.5"
+                                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
                                 </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Размытие фона" FontSize="14" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Slider x:Name="BgBlurSlider" Style="{StaticResource Slide}" Width="170" Minimum="0" Maximum="100"
+                                            LargeChange="10" SmallChange="1" Value="0" ValueChanged="BgBlur_Changed"
+                                            local:Hint.Text="Размывает саму картинку на фоне — всю, а не только под панелями.&#x0a;&#x0a;На звёзды не действует." />
+                                    <TextBlock x:Name="BgBlurValue" Text="0%" Width="40" TextAlignment="Right" FontSize="12.5"
+                                               VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Размытие стекла" FontSize="14" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Slider x:Name="BlurSlider" Style="{StaticResource Slide}" Width="170" Minimum="0" Maximum="100"
-                                            LargeChange="10" SmallChange="1" Value="60" ValueChanged="Blur_Changed" />
+                                            LargeChange="10" SmallChange="1" Value="60" ValueChanged="Blur_Changed"
+                                            local:Hint.Text="Насколько панели и кнопка включения размывают фон под собой: 0 — прозрачное стекло." />
                                     <TextBlock x:Name="BlurValue" Text="60%" Width="40" TextAlignment="Right" FontSize="12.5"
                                                VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
                                 </StackPanel>
@@ -1185,8 +1133,136 @@
             </Grid>
         </Grid>
 
-        <!-- Hint for the hovered button. It floats above the content, so it carries its own piece of the
-             same glass; code places it and clips HintFrost to its shape -->
+        <!-- Windows that open in the middle of the launcher, over everything but its title bar: the list of
+             strategies, the proxy's instructions. Like the hint, the layer carries its own glass; code clips
+             ModalFrost to the open panel. A click beside the panel, or Esc, closes it. -->
+        <Grid x:Name="ModalLayer" Margin="0,44,0,0" Visibility="Collapsed" Opacity="0">
+            <Rectangle Fill="#8C000000" MouseLeftButtonDown="ModalShade_Down" />
+            <Border x:Name="ModalShadow" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="16" Background="#000000"
+                    IsHitTestVisible="False">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.75" />
+                </Border.Effect>
+            </Border>
+            <Grid x:Name="ModalFrost" IsHitTestVisible="False" Margin="0,-44,0,0">
+                <Rectangle Fill="{StaticResource Space}" />
+                <Grid x:Name="ModalSkyHost">
+                    <Grid x:Name="ModalSky" />
+                </Grid>
+                <Grid x:Name="ModalWallpaper" Visibility="Collapsed">
+                    <Grid x:Name="ModalWallpaperHost" Margin="-130">
+                        <Rectangle x:Name="ModalWallpaperBox" />
+                    </Grid>
+                    <Rectangle x:Name="ModalWallpaperDim" />
+                </Grid>
+                <Rectangle Fill="{StaticResource Veil}" />
+            </Grid>
+            <Border x:Name="StrategyPanel" Width="560" MaxHeight="640" HorizontalAlignment="Center" VerticalAlignment="Stretch" Margin="0,24"
+                    CornerRadius="16" BorderBrush="{StaticResource Edge}" BorderThickness="1" Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="12,10,12,8">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="Стратегия обхода" FontSize="14" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Если сайты не открываются, выберите другую" FontSize="12"
+                                       HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button x:Name="AutoButton" Content="Автоподбор" Style="{StaticResource Pill}"
+                                HorizontalAlignment="Right" VerticalAlignment="Center" Click="Auto_Click" />
+                    </Grid>
+
+                    <ListBox x:Name="StrategyList" Grid.Row="1" Margin="6,0,6,8"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.CanContentScroll="False" Padding="0"
+                             TextOptions.TextHintingMode="Fixed"
+                             PreviewMouseWheel="StrategyList_Wheel"
+                             SelectionChanged="Strategy_Changed" />
+                </Grid>
+            </Border>
+            <Border x:Name="ProxyInfoPanel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24"
+                    CornerRadius="16" BorderBrush="{StaticResource Edge}" BorderThickness="1" Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="12,10,12,8">
+                        <Button Content="Ссылка" Style="{StaticResource Pill}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Click="PxCopy_Click"
+                                local:Hint.Text="Копирует ссылку вида tg://proxy… с адресом, портом и ключом этого прокси.&#x0a;&#x0a;Кому нужно: если кнопка «Подключить» не открыла Telegram.&#x0a;&#x0a;Что делать: отправьте ссылку себе в «Избранное» в Telegram и нажмите на неё." />
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="Подключение Telegram" FontSize="14" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Foreground="{StaticResource Text}" />
+                            <TextBlock Text="Делается один раз" FontSize="12"
+                                       HorizontalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                        </StackPanel>
+                        <Button x:Name="PxConnect" Content="Подключить" Style="{StaticResource Pill}"
+                                HorizontalAlignment="Right" VerticalAlignment="Center" Click="PxConnect_Click"
+                                local:Hint.Text="Открывает в Telegram на этом компьютере окно с предложением подключить прокси — останется подтвердить.&#x0a;&#x0a;Кому нужно: при первом включении прокси это происходит само. Кнопка — на случай, если окно закрыли или прокси пропал из настроек Telegram.&#x0a;&#x0a;Если Telegram после этого не соединяется, отключите в его настройках прокси «Попытку соединения по IPv6»." />
+                    </Grid>
+
+                    <StackPanel Grid.Row="1" Margin="34,6,34,16">
+                        <Grid Margin="0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="46" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                <TextBlock Text="1" FontSize="13" Foreground="{StaticResource Text}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Включите прокси" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Большой кнопкой посередине вкладки. Он работает прямо на этом компьютере" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="46" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                <TextBlock Text="2" FontSize="13" Foreground="{StaticResource Text}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Подтвердите в Telegram" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Telegram сам откроется с предложением подключить прокси. Не открылся — нажмите «Подключить» или возьмите ссылку" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="46" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Margin="0,2,0,0" Background="#12FFFFFF" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                                <TextBlock Text="3" FontSize="13" Foreground="{StaticResource Text}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Готово" FontSize="14" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="Дальше Telegram ходит через прокси сам, пока тот включён. Точка у названия вкладки показывает, что он работает" FontSize="12" LineHeight="17" TextWrapping="Wrap"
+                                           Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Hint for the hovered button. It comes up in the middle of the window, over everything, so it
+             carries its own piece of the same glass; code places it and clips HintFrost to its shape -->
         <Grid x:Name="HintLayer" IsHitTestVisible="False" Opacity="0" Visibility="Collapsed">
             <Border x:Name="HintShadow" HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="14" Background="#000000">
                 <Border.Effect>
@@ -1199,11 +1275,10 @@
                     <Grid x:Name="HintSky" />
                 </Grid>
                 <Grid x:Name="HintWallpaper" Visibility="Collapsed">
-                    <!-- wider than the window and tiled as mirror images, so the blur has picture to take in at the edges -->
                     <Grid x:Name="HintWallpaperHost" Margin="-130">
                         <Rectangle x:Name="HintWallpaperBox" />
                     </Grid>
-                    <Rectangle Fill="#A6000000" />
+                    <Rectangle x:Name="HintWallpaperDim" />
                 </Grid>
                 <Rectangle Fill="{StaticResource Veil}" />
             </Grid>

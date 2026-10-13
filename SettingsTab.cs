@@ -14,31 +14,47 @@ using System.Windows.Threading;
 namespace ZapretLauncher
 {
     /// <summary>
-    /// The Settings tab and the looks it controls: the picture behind everything, how much the glass blurs
-    /// it, and the accent colour. The switches for the bypass and the proxy sit on this tab too, but their
-    /// handlers stay with the code they belong to.
+    /// The Settings tab and the looks it controls: the picture behind everything, how bright and how blurred
+    /// it is, how much the glass blurs it, and the accent colour. The switches for the bypass and the proxy
+    /// sit on this tab too, but their handlers stay with the code they belong to.
     /// </summary>
     public partial class MainWindow
     {
-        const double BlurPerPercent = 1.2;   // the slider's default, 60%, is the radius the glass was drawn for (72)
+        const string Stars = "stars";        // what Settings.Background holds when the star sky is chosen
+        const double BlurPerPercent = 1.2;   // the glass slider's default, 60%, is the radius the glass was drawn for (72)
         const double DesignBlur = 72;
-        const double Bleed = 130;            // how far the blurred picture reaches past the window; see MainWindow.xaml
+        const double BackBlurPerPercent = 0.6;
+        const double Bleed = 130;            // how far the picture reaches past the window; see MainWindow.xaml
 
         readonly BlurEffect _frostBlur = new BlurEffect { RenderingBias = RenderingBias.Performance };
+        readonly BlurEffect _backBlur = new BlurEffect { RenderingBias = RenderingBias.Performance };
         Color _accent = Colors.White;
         bool _wallpaperOn, _lookReady;
         DispatcherTimer _saveTimer;
 
+        // Everything under a piece of glass exists three times: under the panels, under the hint and under
+        // a window opened over the launcher. Each has a copy of the stars and a copy of the picture.
+        Grid[] SkyCopies() { return new[] { FrostSky, HintSky, ModalSky }; }
+        Grid[] SkyHosts() { return new[] { FrostSkyHost, HintSkyHost, ModalSkyHost }; }
+        Grid[] PictureCopies() { return new[] { FrostWallpaper, HintWallpaper, ModalWallpaper }; }
+        Grid[] PictureHosts() { return new[] { FrostWallpaperHost, HintWallpaperHost, ModalWallpaperHost }; }
+        System.Windows.Shapes.Rectangle[] PictureBoxes() { return new[] { FrostWallpaperBox, HintWallpaperBox, ModalWallpaperBox }; }
+        System.Windows.Shapes.Rectangle[] PictureDims() { return new[] { FrostWallpaperDim, HintWallpaperDim, ModalWallpaperDim }; }
+
         /// <summary>Puts the saved looks on the window. Called once, from the constructor.</summary>
         void InitLook()
         {
-            FrostSky.Effect = HintSky.Effect = FrostWallpaperBox.Effect = HintWallpaperBox.Effect = _frostBlur;
+            foreach (var sky in SkyCopies()) sky.Effect = _frostBlur;
+            foreach (var box in PictureBoxes()) box.Effect = _frostBlur;
+            WallpaperBox.Effect = _backBlur;
             Shell.SizeChanged += (s, e) => FitWallpaper();
 
             ApplyAccent(ParseColor(_s.Accent) ?? Colors.White);
             ApplyWallpaper();
             ApplyBlur();
             BlurSlider.Value = _s.Blur;
+            BrightSlider.Value = _s.BackBright;
+            BgBlurSlider.Value = _s.BackBlur;
             ShowAccent();
             _lookReady = true;
         }
@@ -66,72 +82,139 @@ namespace ZapretLauncher
             catch { return new string[0]; }
         }
 
+        static BitmapSource LoadPicture(Stream file)
+        {
+            // a photo can be many times the window; decoding it whole would cost memory for nothing
+            int width = BitmapFrame.Create(file, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).PixelWidth;
+            file.Position = 0;
+
+            var picture = new BitmapImage();
+            picture.BeginInit();
+            picture.CacheOption = BitmapCacheOption.OnLoad;   // read now, so the file is not held open
+            picture.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            picture.StreamSource = file;
+            if (width > 2560) picture.DecodePixelWidth = 2560;
+            picture.EndInit();
+            picture.Freeze();
+            return picture;
+        }
+
         static BitmapSource LoadPicture(string path)
         {
-            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            {
-                // a photo can be many times the window; decoding it whole would cost memory for nothing
-                int width = BitmapFrame.Create(file, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).PixelWidth;
-                file.Position = 0;
+            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) return LoadPicture(file);
+        }
 
-                var picture = new BitmapImage();
-                picture.BeginInit();
-                picture.CacheOption = BitmapCacheOption.OnLoad;   // read now, so the file is not held open
-                picture.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                picture.StreamSource = file;
-                if (width > 2560) picture.DecodePixelWidth = 2560;
-                picture.EndInit();
-                picture.Freeze();
-                return picture;
+        // the picture the launcher comes with
+        static BitmapSource OwnPicture()
+        {
+            using (var packed = typeof(MainWindow).Assembly.GetManifestResourceStream("background.jpg"))
+            using (var copy = new MemoryStream())
+            {
+                packed.CopyTo(copy);   // the decoder wants a stream it can rewind
+                copy.Position = 0;
+                return LoadPicture(copy);
             }
         }
 
-        /// <summary>Shows the saved picture, or the stars when there is none or it will not load.</summary>
+        /// <summary>
+        /// Shows the chosen backdrop: the stars, the user's picture, or the launcher's own - which also stands
+        /// in for a picture that will not load.
+        /// </summary>
         void ApplyWallpaper()
         {
             BitmapSource picture = null;
-            if (!string.IsNullOrEmpty(_s.Background))
+            bool own = false;
+            if (_s.Background != Stars)
             {
-                try { picture = LoadPicture(_s.Background); }
-                catch { }
+                if (!string.IsNullOrEmpty(_s.Background))
+                {
+                    try { picture = LoadPicture(_s.Background); }
+                    catch { }
+                }
+                if (picture == null)
+                {
+                    try
+                    {
+                        picture = OwnPicture();
+                        own = true;
+                    }
+                    catch { }
+                }
             }
             _wallpaperOn = picture != null;
 
+            ImageBrush tiled = null;
             if (_wallpaperOn)
             {
-                WallpaperBox.Fill = new ImageBrush(picture) { Stretch = Stretch.UniformToFill };
-                // The copy under the glass is the same picture, laid out the same way, but repeated past the
-                // window's edges as mirror images: a blur fades towards whatever lies outside the picture.
-                var under = new ImageBrush(picture)
+                // Every copy is the same picture laid out the same way and repeated past the window's edges
+                // as mirror images: a blur fades towards whatever lies outside the picture.
+                tiled = new ImageBrush(picture)
                 {
                     Stretch = Stretch.UniformToFill,
                     TileMode = TileMode.FlipXY,
                     ViewportUnits = BrushMappingMode.Absolute
                 };
-                FrostWallpaperBox.Fill = HintWallpaperBox.Fill = under;
-                FitWallpaper();
             }
-            else
-            {
-                WallpaperBox.Fill = FrostWallpaperBox.Fill = HintWallpaperBox.Fill = null;
-            }
+            WallpaperBox.Fill = tiled;
+            foreach (var box in PictureBoxes()) box.Fill = tiled;
+            FitWallpaper();
 
             var shown = _wallpaperOn ? Visibility.Visible : Visibility.Collapsed;
             var hidden = _wallpaperOn ? Visibility.Collapsed : Visibility.Visible;
-            Wallpaper.Visibility = FrostWallpaper.Visibility = HintWallpaper.Visibility = shown;
-            Sky.Visibility = FrostSkyHost.Visibility = HintSkyHost.Visibility = hidden;
+            Wallpaper.Visibility = shown;
+            foreach (var copy in PictureCopies()) copy.Visibility = shown;
+            Sky.Visibility = hidden;
+            foreach (var host in SkyHosts()) host.Visibility = hidden;
             UpdateDrift();
 
-            BgName.Text = _wallpaperOn ? "Своя картинка" : "Звёзды";
-            BgReset.Visibility = shown;
+            BgName.Text = !_wallpaperOn ? "Звёзды" : own ? "Стандартный" : "Своя картинка";
+            // brightness and blur are the picture's; the stars have neither
+            BrightSlider.IsEnabled = BgBlurSlider.IsEnabled = _wallpaperOn;
+            BrightSlider.Opacity = BgBlurSlider.Opacity = BrightValue.Opacity = BgBlurValue.Opacity = _wallpaperOn ? 1 : 0.4;
+            ApplyBackdrop();
         }
 
-        // the tile of the picture under the glass has to sit exactly where the window is
+        // the tile of the picture has to sit exactly where the window is
         void FitWallpaper()
         {
-            var under = FrostWallpaperBox.Fill as ImageBrush;
-            if (under == null || Shell.ActualWidth <= 0) return;
-            under.Viewport = new Rect(Bleed, Bleed, Shell.ActualWidth, Shell.ActualHeight);
+            var tiled = WallpaperBox.Fill as ImageBrush;
+            if (tiled == null || Shell.ActualWidth <= 0) return;
+            tiled.Viewport = new Rect(Bleed, Bleed, Shell.ActualWidth, Shell.ActualHeight);
+        }
+
+        /// <summary>The picture's brightness and its own blur, from the saved 0..100 each.</summary>
+        void ApplyBackdrop()
+        {
+            // less bright is a darker veil over the picture; under the glass it is a shade darker still
+            double dim = 1 - _s.BackBright / 100.0;
+            WallpaperDim.Fill = Frozen(new SolidColorBrush(Color.FromArgb((byte)(dim * 255), 0, 0, 0)));
+            var under = Frozen(new SolidColorBrush(Color.FromArgb((byte)(Math.Min(0.92, dim + 0.14) * 255), 0, 0, 0)));
+            foreach (var veil in PictureDims()) veil.Fill = under;
+
+            double radius = _s.BackBlur * BackBlurPerPercent;
+            _backBlur.Radius = radius;
+            // sharp, it is drawn as it is; blurred, small and stretched like the copies under the glass
+            WallpaperHost.CacheMode = radius < 1 ? null : new BitmapCache(Math.Min(1, Math.Max(0.25, 18 / radius)));
+
+            BrightValue.Text = _s.BackBright + "%";
+            BgBlurValue.Text = _s.BackBlur + "%";
+            ApplyBlur();
+        }
+
+        void SetBackground(string value, string said)
+        {
+            _s.Background = value;
+            _s.Save();
+            ApplyWallpaper();
+            // the launcher's copy of a picture no longer used is not kept
+            if (value == "" || value == Stars)
+            {
+                foreach (var old in SavedPictures())
+                {
+                    try { File.Delete(old); } catch { }
+                }
+            }
+            Log(said);
         }
 
         void BgPick_Click(object sender, RoutedEventArgs e)
@@ -155,11 +238,7 @@ namespace ZapretLauncher
                     foreach (var old in SavedPictures()) File.Delete(old);
                     File.Copy(dialog.FileName, copy, true);
                 }
-
-                _s.Background = copy;
-                _s.Save();
-                ApplyWallpaper();
-                Log("Фон изменён");
+                SetBackground(copy, "Фон изменён");
             }
             catch (Exception)
             {
@@ -167,30 +246,44 @@ namespace ZapretLauncher
             }
         }
 
-        void BgReset_Click(object sender, RoutedEventArgs e)
+        void BgReset_Click(object sender, RoutedEventArgs e) { SetBackground("", "Фон: стандартный"); }
+
+        void BgStars_Click(object sender, RoutedEventArgs e) { SetBackground(Stars, "Фон: звёзды"); }
+
+        void Bright_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            _s.Background = "";
-            _s.Save();
-            ApplyWallpaper();
-            foreach (var old in SavedPictures())
-            {
-                try { File.Delete(old); } catch { }
-            }
-            Log("Фон: звёзды");
+            if (!_lookReady) return;
+            int value = (int)Math.Round(e.NewValue);
+            if (value == _s.BackBright) return;
+            _s.BackBright = value;
+            ApplyBackdrop();
+            SaveSoon();
+        }
+
+        void BgBlur_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (!_lookReady) return;
+            int value = (int)Math.Round(e.NewValue);
+            if (value == _s.BackBlur) return;
+            _s.BackBlur = value;
+            ApplyBackdrop();
+            SaveSoon();
         }
 
         // ------------------------------------------------------------- blur
         /// <summary>Sets how strongly the glass blurs what is under it, from the saved 0..100.</summary>
         void ApplyBlur()
         {
-            double radius = _s.Blur * BlurPerPercent;
+            // Glass over a picture that is itself blurred must not be sharper than the picture around it:
+            // the two blurs add up the way blurs do, as the root of the sum of squares.
+            double glass = _s.Blur * BlurPerPercent, back = _wallpaperOn ? _backBlur.Radius : 0;
+            double radius = Math.Sqrt(glass * glass + back * back);
             _frostBlur.Radius = radius;
 
             // The copies under the glass are drawn small and stretched: a heavy blur hides that and costs a
             // fraction. A light blur would show the pixels, so the lighter it is, the closer to full size.
             double scale = Math.Min(1, Math.Max(0.25, 18 / Math.Max(radius, 1)));
-            foreach (var host in new[] { FrostSkyHost, HintSkyHost, FrostWallpaperHost, HintWallpaperHost })
-                host.CacheMode = new BitmapCache(scale);
+            foreach (var host in SkyHosts().Concat(PictureHosts())) host.CacheMode = new BitmapCache(scale);
 
             BuildFrostSky();
             BlurValue.Text = _s.Blur + "%";

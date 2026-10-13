@@ -93,7 +93,11 @@ namespace ZapretLauncher
                 SetupCursor();
                 MoveTabBar(false);
             };
-            LayoutUpdated += (s, e) => UpdateFrost();
+            LayoutUpdated += (s, e) =>
+            {
+                UpdateFrost();
+                FitModal();
+            };
             IsVisibleChanged += (s, e) => UpdateDrift();
             StateChanged += (s, e) =>
             {
@@ -319,27 +323,79 @@ namespace ZapretLauncher
             HintLayer.Visibility = Visibility.Visible;
             HintLayer.UpdateLayout();
 
-            // Centred on the element, but clear of the whole panel it sits in, so the hint never covers
-            // the neighbouring buttons; kept inside the window, and below the panel if there is no room above.
-            const double gap = 10, edge = 12;
-            FrameworkElement panel = target;
-            for (var p = VisualTreeHelper.GetParent(target); p != null && p != Shell; p = VisualTreeHelper.GetParent(p))
-            {
-                var border = p as System.Windows.Controls.Border;
-                if (border != null && !double.IsNaN(Glass.GetRadius(border))) { panel = border; break; }
-            }
-            var over = target.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, target.ActualWidth, target.ActualHeight));
-            var anchor = panel.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, panel.ActualWidth, panel.ActualHeight));
+            // in the middle of the window, over everything, wherever the button is
             double w = HintBox.ActualWidth, h = HintBox.ActualHeight;
-            double x = Math.Round(Math.Max(edge, Math.Min(Shell.ActualWidth - w - edge, over.Left + over.Width / 2 - w / 2)));
-            double y = Math.Round(anchor.Top - gap - h);
-            if (y < edge) y = Math.Round(anchor.Bottom + gap);
+            double x = Math.Round((Shell.ActualWidth - w) / 2), y = Math.Round((Shell.ActualHeight - h) / 2);
 
             HintBox.Margin = HintShadow.Margin = new Thickness(x, y, 0, 0);
             HintShadow.Width = w;
             HintShadow.Height = h;
             HintFrost.Clip = new RectangleGeometry(new Rect(x, y, w, h), 14, 14);
             HintLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(140)));
+        }
+
+        // ------------------------------------------------------------ modal
+        // A panel opened in the middle of the launcher, over everything: the list of strategies, the proxy's
+        // instructions. One at a time; a click beside it, Esc or a change of tab closes it.
+        FrameworkElement _modal;
+        string _modalKey;
+
+        void OpenModal(FrameworkElement panel)
+        {
+            HideHint();
+            StrategyPanel.Visibility = ProxyInfoPanel.Visibility = Visibility.Collapsed;
+            panel.Visibility = Visibility.Visible;
+            _modal = panel;
+            _modalKey = null;
+            ModalLayer.Visibility = Visibility.Visible;
+            ModalLayer.UpdateLayout();
+            FitModal();
+            ModalLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(180)));
+        }
+
+        void CloseModal()
+        {
+            if (_modal == null) return;
+            _modal = null;
+            HideHint();
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(140));
+            fade.Completed += (s, e) => { if (_modal == null) ModalLayer.Visibility = Visibility.Collapsed; };
+            ModalLayer.BeginAnimation(OpacityProperty, fade);
+        }
+
+        // the glass and the shadow of the open panel follow its place and size
+        void FitModal()
+        {
+            if (_modal == null || _modal.ActualWidth <= 0) return;
+            var at = _modal.TransformToAncestor(Shell).TransformBounds(new Rect(0, 0, _modal.ActualWidth, _modal.ActualHeight));
+            string key = at.ToString();
+            if (key == _modalKey) return;
+            _modalKey = key;
+
+            ModalFrost.Clip = new RectangleGeometry(at, 16, 16);
+            // the shadow lives in the layer, which starts below the title bar
+            var inLayer = _modal.TransformToAncestor(ModalLayer).Transform(new Point(0, 0));
+            ModalShadow.Margin = new Thickness(inLayer.X, inLayer.Y, 0, 0);
+            ModalShadow.Width = at.Width;
+            ModalShadow.Height = at.Height;
+        }
+
+        void ModalShade_Down(object sender, MouseButtonEventArgs e) { CloseModal(); }
+
+        void Strategies_Click(object sender, RoutedEventArgs e)
+        {
+            OpenModal(StrategyPanel);
+            if (StrategyList.SelectedItem != null) StrategyList.ScrollIntoView(StrategyList.SelectedItem);
+        }
+
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            base.OnPreviewKeyDown(e);
+            if (e.Key == Key.Escape && _modal != null)
+            {
+                CloseModal();
+                e.Handled = true;
+            }
         }
 
         // -------------------------------------------------------------- sky
@@ -416,13 +472,11 @@ namespace ZapretLauncher
         void BuildFrostSky()
         {
             double strength = Math.Min(1, _frostBlur.Radius / DesignBlur);
-            FrostSky.Children.Clear();
-            HintSky.Children.Clear();
+            foreach (var copy in SkyCopies()) copy.Children.Clear();
             foreach (var l in _starLayers)
             {
                 var glow = StarBrush(l.Item1, 1 + (FrostGrow - 1) * strength, 1 + (FrostGlow - 1) * strength, l.Item2);
-                FrostSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
-                HintSky.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
+                foreach (var copy in SkyCopies()) copy.Children.Add(new System.Windows.Shapes.Rectangle { Fill = glow });
             }
         }
 
@@ -679,7 +733,8 @@ namespace ZapretLauncher
             var d = TimeSpan.FromMilliseconds(400);
             Color edge = on ? color : pulse ? Hex("#AAAAAA") : Hex(glow > 0 ? "#66FFFFFF" : "#33FFFFFF");
             ((SolidColorBrush)ring.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(edge, d));
-            ring.BeginAnimation(System.Windows.Shapes.Shape.StrokeThicknessProperty, new DoubleAnimation(on ? 2 : 1, d));
+            // half the old widths: the button is drawn enlarged, and its lines with it
+            ring.BeginAnimation(System.Windows.Shapes.Shape.StrokeThicknessProperty, new DoubleAnimation(on ? 1 : 0.5, d));
             Color tint = Hex(on ? "#A6FFFFFF" : pulse ? "#73FFFFFF" : glow > 0 ? "#5CFFFFFF" : "#47FFFFFF");
             ((SolidColorBrush)glyph.Stroke).BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(tint, d));
 

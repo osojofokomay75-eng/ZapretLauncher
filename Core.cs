@@ -38,8 +38,10 @@ namespace ZapretLauncher
         public bool ProxyAuto;              // start TG WS Proxy together with the launcher
         public string Tab = "zapret";       // the tab that was open last
         public string ProxyLinked = "";     // the proxy address and key Telegram has already been offered
-        public string Background = "";      // the picture behind everything; empty for the star sky
+        public string Background = "";      // the picture behind everything: a file, "stars", or empty for the launcher's own
         public int Blur = 60;               // how much the glass blurs what is under it, 0..100
+        public int BackBright = 50;         // how bright the picture is left, 0..100
+        public int BackBlur;                // how much the picture itself is blurred, 0..100
         public string Accent = "#FFFFFF";   // the accent colour
         public int WindowWidth, WindowHeight;   // the size the window was left at; 0 until it has been resized
 
@@ -48,6 +50,7 @@ namespace ZapretLauncher
             var s = new Settings();
             try
             {
+                int blur;
                 foreach (var line in File.ReadAllLines(Paths.SettingsFile))
                 {
                     int i = line.IndexOf('=');
@@ -65,10 +68,15 @@ namespace ZapretLauncher
                         case "proxylinked": s.ProxyLinked = v; break;
                         case "background": s.Background = v; break;
                         case "blur":
-                            int blur;
                             if (int.TryParse(v, out blur)) s.Blur = Math.Max(0, Math.Min(100, blur));
                             break;
                         case "accent": s.Accent = v; break;
+                        case "backbright":
+                            if (int.TryParse(v, out blur)) s.BackBright = Math.Max(0, Math.Min(100, blur));
+                            break;
+                        case "backblur":
+                            if (int.TryParse(v, out blur)) s.BackBlur = Math.Max(0, Math.Min(100, blur));
+                            break;
                         case "width": int.TryParse(v, out s.WindowWidth); break;
                         case "height": int.TryParse(v, out s.WindowHeight); break;
                     }
@@ -95,6 +103,8 @@ namespace ZapretLauncher
                     "background=" + Background,
                     "blur=" + Blur,
                     "accent=" + Accent,
+                    "backbright=" + BackBright,
+                    "backblur=" + BackBlur,
                     "width=" + WindowWidth,
                     "height=" + WindowHeight,
                 });
