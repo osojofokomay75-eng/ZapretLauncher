@@ -38,6 +38,9 @@ namespace ZapretLauncher
         public bool ProxyAuto;              // start TG WS Proxy together with the launcher
         public string Tab = "zapret";       // the tab that was open last
         public string ProxyLinked = "";     // the proxy address and key Telegram has already been offered
+        public string Background = "";      // the picture behind everything; empty for the star sky
+        public int Blur = 60;               // how much the glass blurs what is under it, 0..100
+        public string Accent = "#FFFFFF";   // the accent colour
 
         public static Settings Load()
         {
@@ -59,6 +62,12 @@ namespace ZapretLauncher
                         case "proxyauto": s.ProxyAuto = v == "1"; break;
                         case "tab": s.Tab = v; break;
                         case "proxylinked": s.ProxyLinked = v; break;
+                        case "background": s.Background = v; break;
+                        case "blur":
+                            int blur;
+                            if (int.TryParse(v, out blur)) s.Blur = Math.Max(0, Math.Min(100, blur));
+                            break;
+                        case "accent": s.Accent = v; break;
                     }
                 }
             }
@@ -80,6 +89,9 @@ namespace ZapretLauncher
                     "proxyauto=" + (ProxyAuto ? "1" : "0"),
                     "tab=" + Tab,
                     "proxylinked=" + ProxyLinked,
+                    "background=" + Background,
+                    "blur=" + Blur,
+                    "accent=" + Accent,
                 });
             }
             catch { }

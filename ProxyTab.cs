@@ -10,12 +10,13 @@ namespace ZapretLauncher
 {
     /// <summary>
     /// The second tab: TG WS Proxy, a local proxy for Telegram. It mirrors the zapret tab - power button on
-    /// top, a card in the middle, switches and action buttons below - and is meant to need one press:
-    /// the power button starts the proxy and hands it to Telegram.
+    /// top, a card under it - and is meant to need one press: the power button starts the proxy and hands
+    /// it to Telegram. Its switches live on the Settings tab. Switching between the tabs is here as well.
     /// </summary>
     public partial class MainWindow
     {
         enum ProxyState { Missing, Installing, Idle, Starting, Running }
+        enum Tab { Zapret, Proxy, Settings }
 
         // "photos and video do not load" is cured by a different DC -> IP table; these are the ones worth trying
         static readonly string[][] DcTables =
@@ -29,7 +30,7 @@ namespace ZapretLauncher
         readonly ProxyRunner _proxy = new ProxyRunner();
         ProxyConfig _px;
         ProxyState _pxState = ProxyState.Idle;
-        bool _proxyTab;
+        Tab _tab = Tab.Zapret;
         bool _pxOwnTray;    // out of sight the proxy would not start this time, so it runs with its own tray icon
         Action<string> _openLink = link => Process.Start(link);
 
@@ -49,17 +50,18 @@ namespace ZapretLauncher
         // Checked rather than Click, so that the tab also follows a choice made from the keyboard
         void Tab_Checked(object sender, RoutedEventArgs e)
         {
-            if (ProxyView == null) return;   // raised while the window is still being put together
-            ShowTab(ReferenceEquals(sender, TabProxy));
+            if (SettingsView == null) return;   // raised while the window is still being put together
+            ShowTab(ReferenceEquals(sender, TabProxy) ? Tab.Proxy : ReferenceEquals(sender, TabSettings) ? Tab.Settings : Tab.Zapret);
         }
 
-        void ShowTab(bool proxy)
+        void ShowTab(Tab tab)
         {
-            if (proxy == _proxyTab) return;
-            _proxyTab = proxy;
+            if (tab == _tab) return;
+            _tab = tab;
             HideHint();
-            ZapretView.Visibility = proxy ? Visibility.Collapsed : Visibility.Visible;
-            ProxyView.Visibility = proxy ? Visibility.Visible : Visibility.Collapsed;
+            var views = new[] { ZapretView, ProxyView, SettingsView };
+            for (int i = 0; i < views.Length; i++)
+                views[i].Visibility = i == (int)tab ? Visibility.Visible : Visibility.Collapsed;
             RefreshVersion();
 
             // the glass has to be cut out again for the panels of the tab now on screen
@@ -71,11 +73,11 @@ namespace ZapretLauncher
                 _frostKey = null;
                 UpdateFrost();
             }
-            UIElement view = proxy ? (UIElement)ProxyView : ZapretView;
-            view.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
+            views[(int)tab].BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
 
-            string name = proxy ? "proxy" : "zapret";
-            if (_s.Tab != name)
+            // the launcher opens on the service last looked at; Settings is a place to visit, not to start from
+            string name = tab == Tab.Proxy ? "proxy" : "zapret";
+            if (tab != Tab.Settings && _s.Tab != name)
             {
                 _s.Tab = name;
                 _s.Save();
@@ -97,7 +99,7 @@ namespace ZapretLauncher
             _pxState = st;
 
             string title, subtitle;
-            Color color, disc;
+            Color color;
             double glow = 0;
             bool pulse = false;
 
@@ -105,25 +107,25 @@ namespace ZapretLauncher
             {
                 case ProxyState.Missing:
                     title = "Нужна загрузка"; subtitle = "Нажмите, чтобы скачать TG WS Proxy и включить его";
-                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); glow = 0.3; break;
+                    color = Hex("#BDBDBD"); glow = 0.3; break;
                 case ProxyState.Installing:
                     title = "Загрузка…"; subtitle = "Скачиваю TG WS Proxy с GitHub";
-                    color = Hex("#BDBDBD"); disc = Hex("#66000000"); pulse = true; break;
+                    color = Hex("#BDBDBD"); pulse = true; break;
                 case ProxyState.Starting:
                     title = "Запуск…"; subtitle = "Прокси поднимается, это несколько секунд";
-                    color = Hex("#D9D9D9"); disc = Hex("#59000000"); pulse = true; break;
+                    color = Hex("#D9D9D9"); pulse = true; break;
                 case ProxyState.Running:
                     title = "Работает"; subtitle = "Прокси для Telegram включён";
-                    color = Hex("#FFFFFF"); disc = Hex("#40000000"); glow = 0.7; break;
+                    color = _accent; glow = 0.7; break;
                 default:
                     title = "Отключено"; subtitle = "Нажмите, чтобы включить прокси для Telegram";
-                    color = Hex("#8A8A8A"); disc = Hex("#73000000"); break;
+                    color = Hex("#8A8A8A"); break;
             }
 
             PxStatus.Text = title;
             PxSub.Text = subtitle;
             PxStatus.Foreground = new SolidColorBrush(st == ProxyState.Running ? color : Hex("#F2F2F2"));
-            Tint(PxRing, PxIcon, PxDisc, PxGlowFx, color, disc, glow, pulse);
+            Tint(PxRing, PxIcon, PxHaloIn, PxHaloOut, color, glow, pulse, st == ProxyState.Running);
 
             bool locked = st == ProxyState.Installing || st == ProxyState.Starting;
             PxPower.IsEnabled = !locked;

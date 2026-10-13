@@ -232,7 +232,8 @@ namespace ZapretLauncher
 
         /// <summary>
         /// Removes everything Install created. With keepSettings the choices the user made (settings.ini,
-        /// their own *user*.txt lists and the Telegram proxy's config) stay for a later re-install.
+        /// their own *user*.txt lists, the Telegram proxy's config and the background picture) stay for a
+        /// later re-install.
         /// </summary>
         public static void Uninstall(string dir, bool keepSettings)
         {
@@ -263,6 +264,7 @@ namespace ZapretLauncher
             }
 
             string lists = Path.Combine(Paths.Engine, "lists");
+            string picture = Settings.Load().Background;
             foreach (var file in Directory.GetFiles(Paths.Root, "*", SearchOption.AllDirectories))
             {
                 bool settings = string.Equals(file, Paths.SettingsFile, StringComparison.OrdinalIgnoreCase);
@@ -270,7 +272,8 @@ namespace ZapretLauncher
                     && Path.GetFileName(file).IndexOf("user", StringComparison.OrdinalIgnoreCase) >= 0
                     && file.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
                 bool proxyConfig = string.Equals(file, TgProxy.ConfigFile, StringComparison.OrdinalIgnoreCase);
-                if (!settings && !userList && !proxyConfig) TryDelete(file);
+                bool background = string.Equals(file, picture, StringComparison.OrdinalIgnoreCase);
+                if (!settings && !userList && !proxyConfig && !background) TryDelete(file);
             }
             // deepest folders first, and only the ones left empty
             foreach (var sub in Directory.GetDirectories(Paths.Root, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
